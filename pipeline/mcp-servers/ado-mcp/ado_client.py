@@ -98,7 +98,7 @@ class ADOClient:
         All filters are combined with AND. Omitting a filter leaves that axis unconstrained.
 
         Args:
-            state: Filter by work item state (e.g. "To Do", "Doing").
+            state: Filter by work item state (e.g. "New", "Active", "Resolved", "Closed").
             item_type: Filter by work item type (e.g. "User Story", "Feature").
             tag: Filter by tag (e.g. "ai-pipeline"). Uses CONTAINS — partial match.
 
