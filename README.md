@@ -1,1 +1,3 @@
 # sdlc-ai-pipeline
+
+An AI-powered, fully automated software development lifecycle pipeline that takes a plain-text work item created by a Product Owner in Azure DevOps and drives it end-to-end — through requirements clarification, user story creation, code generation, testing, auditing, and automatic PR merge — with no human developer or tester in the loop. The pipeline is orchestrated by a set of specialised Claude-powered agents, each with a defined scope of responsibility, that collaborate through structured JSON contracts and operate against a living React + .NET demo application. See [CLAUDE.md](CLAUDE.md) for the full architecture, agent breakdown, coding standards, and audit rubric.
