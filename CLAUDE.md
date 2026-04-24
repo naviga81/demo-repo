@@ -61,6 +61,14 @@
        │
        │  2. ADO board updated with User Stories
        ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                         SPEC AGENT                                  │
+│   Translates stories + structured spec into a Low Level Design      │
+│   Produces: LLD JSON document attached to ADO as a comment          │
+└──────┬──────────────────────────────────────────────────────────────┘
+       │
+       │  3. LLD document produced; code agents receive blueprint
+       ▼
 ┌──────────────────────────────┐   ┌──────────────────────────────────┐
 │    FRONTEND AGENT            │   │        BACKEND AGENT             │
 │    Writes React code         │   │        Writes .NET code          │
@@ -68,7 +76,7 @@
 └──────────────┬───────────────┘   └─────────────────┬────────────────┘
                │                                     │
                └────────────────┬────────────────────┘
-                                │  3. Code committed to feature branch
+                                │  4. Code committed to feature branch
                                 ▼
                ┌────────────────────────────────────┐
                │           TEST AGENT               │
@@ -76,7 +84,7 @@
                │  Runs the test suite               │
                │  Reports pass/fail + coverage      │
                └────────────────┬───────────────────┘
-                                │  4. Test results attached to run
+                                │  5. Test results attached to run
                                 ▼
                ┌────────────────────────────────────┐
                │           AUDIT AGENT              │
@@ -84,7 +92,7 @@
                │  Scores against rubric (0–10)      │
                │  Produces structured audit report  │
                └────────────────┬───────────────────┘
-                                │  5. Audit report produced
+                                │  6. Audit report produced
                                 ▼
                ┌────────────────────────────────────┐
                │        SUPERVISOR AGENT            │
@@ -102,6 +110,7 @@
 | `PENDING_CLARIFICATION` | Work item picked up, clarification in progress |
 | `CLARIFICATION_FAILED` | Requirements too vague; comment written back to ADO |
 | `STORIES_CREATED` | ADO updated with User Stories; coding phase starting |
+| `SPEC_IN_PROGRESS` | Spec Agent producing Low Level Design document |
 | `CODING_IN_PROGRESS` | Frontend and Backend agents writing code |
 | `TESTING_IN_PROGRESS` | Test Agent running suite |
 | `AUDIT_IN_PROGRESS` | Audit Agent scoring the changes |
@@ -122,7 +131,7 @@
 - Invoke the Clarification Step on each new work item
 - If clarification score < 50: post clarifying questions to ADO, set item state to `Needs Info`, halt pipeline for that item
 - If clarification score >= 50: invoke the ADO Story Writer to break the requirement into User Stories and update the ADO board
-- Sequentially trigger each downstream agent in order: Frontend → Backend → Test → Audit → Supervisor
+- Sequentially trigger each downstream agent in order: Spec → Frontend → Backend → Test → Audit → Supervisor
 - Maintain a pipeline run record (JSON) tracking state, agent outputs, and timestamps
 - Handle agent failures: log, mark pipeline as failed, notify via ADO comment
 
@@ -217,7 +226,59 @@ Status updates are printed to the terminal in structured format and written to t
 
 ---
 
-### 3.4 Frontend Agent
+### 3.4 Spec Agent
+
+**Role:** Translates user stories and the structured spec into a technical Low Level Design (LLD) document that serves as the primary implementation blueprint for the Frontend and Backend agents.
+
+**Responsibilities:**
+- Read all User Story IDs produced by the Story Writer and fetch their full details from ADO
+- Read the structured spec from the Clarification Agent
+- Read the current demo app codebase (read-only) to understand existing file structure, component hierarchy, API surface, and data models
+- Produce a structured LLD JSON document covering: files to create and modify, component breakdown, API endpoint definitions (method, path, request/response shapes), data model changes, state management changes, new dependencies
+- Attach a human-readable LLD summary as an ADO comment on the parent work item
+- Pass the LLD as a structured JSON contract to the Frontend and Backend agents
+
+**LLD Schema:**
+```json
+{
+  "work_item_id": "string",
+  "frontend_changes": {
+    "components_to_create": ["string"],
+    "components_to_modify": ["string"],
+    "hooks": ["string"],
+    "state_changes": ["string"],
+    "props_interfaces": ["string"]
+  },
+  "backend_changes": {
+    "endpoints": [
+      {
+        "method": "string",
+        "path": "string",
+        "request_body": {},
+        "response_body": {}
+      }
+    ],
+    "services": ["string"],
+    "data_models": ["string"],
+    "dto_changes": ["string"]
+  },
+  "files_to_create": ["string"],
+  "files_to_modify": ["string"],
+  "new_dependencies": {
+    "frontend": ["string"],
+    "backend": ["string"]
+  }
+}
+```
+
+**Inputs:** `StructuredSpec` from Clarification Agent, User Story IDs from Story Writer, current demo app codebase (read-only)
+**Outputs:** LLD JSON document, ADO comment with LLD summary
+
+**Must NOT:** Write any application code, make product or scope decisions, or modify ADO work item states (read and comment only).
+
+---
+
+### 3.5 Frontend Agent
 
 **Role:** Writes all React/TypeScript code changes required by the feature.
 
@@ -246,12 +307,12 @@ Status updates are printed to the terminal in structured format and written to t
 - Do not install new npm packages without flagging them in the change summary
 - TypeScript strict mode must be satisfied — no `any` types without explicit justification
 
-**Inputs:** Structured spec, User Stories, current frontend codebase
+**Inputs:** Structured spec, User Stories, LLD document from Spec Agent, current frontend codebase
 **Outputs:** Committed frontend code on feature branch, change summary JSON (includes self-review log, dependency justification if applicable, visual description)
 
 ---
 
-### 3.5 Backend Agent
+### 3.6 Backend Agent
 
 **Role:** Writes all .NET C# code changes required by the feature.
 
@@ -280,12 +341,12 @@ Status updates are printed to the terminal in structured format and written to t
 - Do not add NuGet packages without flagging them in the change summary
 - All public methods must have XML doc comments
 
-**Inputs:** Structured spec, User Stories, current backend codebase, Frontend Agent's change summary (for API contract validation)
+**Inputs:** Structured spec, User Stories, LLD document from Spec Agent, current backend codebase, Frontend Agent's change summary (for API contract validation)
 **Outputs:** Committed backend code on feature branch, change summary JSON (includes self-review log, API contract validation result, dependency justification if applicable)
 
 ---
 
-### 3.6 Test Agent
+### 3.7 Test Agent
 
 **Role:** Writes and executes tests for the changes introduced by the Frontend and Backend agents.
 
@@ -320,7 +381,7 @@ Status updates are printed to the terminal in structured format and written to t
 
 ---
 
-### 3.7 Audit Agent
+### 3.8 Audit Agent
 
 **Role:** Independent code reviewer that scores all pipeline output against defined standards.
 
@@ -349,7 +410,7 @@ Status updates are printed to the terminal in structured format and written to t
 
 ---
 
-### 3.8 Supervisor Agent
+### 3.9 Supervisor Agent
 
 **Role:** Final decision-maker. Collects all scores and determines whether the PR is auto-merged.
 
@@ -481,6 +542,7 @@ sdlc-ai-pipeline/
 │   ├── agents/
 │   │   ├── clarification_agent.py     # Clarification Step agent
 │   │   ├── story_writer_agent.py      # ADO User Story creator
+│   │   ├── spec_agent.py              # Low Level Design producer
 │   │   ├── frontend_agent.py          # React code writer
 │   │   ├── backend_agent.py           # .NET code writer
 │   │   ├── test_agent.py              # Test writer + runner
@@ -495,6 +557,7 @@ sdlc-ai-pipeline/
 │   │
 │   ├── contracts/
 │   │   ├── structured_spec.py         # Pydantic model: StructuredSpec
+│   │   ├── lld_document.py            # Pydantic model: LLDDocument
 │   │   ├── audit_report.py            # Pydantic model: AuditReport
 │   │   ├── test_results.py            # Pydantic model: TestResults
 │   │   ├── change_summary.py          # Pydantic model: ChangeSummary
@@ -504,6 +567,7 @@ sdlc-ai-pipeline/
 │   │   ├── orchestrator.md
 │   │   ├── clarification.md
 │   │   ├── story_writer.md
+│   │   ├── spec.md
 │   │   ├── frontend.md
 │   │   ├── backend.md
 │   │   ├── test.md
@@ -663,7 +727,7 @@ The composite score is a weighted sum of the categories below.
 **3. Test Coverage & Quality (2.0 pts)**
 - Are all acceptance criteria covered by at least one test?
 - Is line coverage on changed files >= 70%?
-- Are the per-function, per-endpoint, and per-component test rules from Section 3.6 satisfied?
+- Are the per-function, per-endpoint, and per-component test rules from Section 3.7 satisfied?
 - Are tests well-structured and meaningful (not just coverage farming)?
 - Scoring: 2.0 = all rules satisfied, >= 70% coverage, quality tests; 1.0 = some coverage gaps or missing rule-required tests; 0 = missing tests or < 50% coverage
 
