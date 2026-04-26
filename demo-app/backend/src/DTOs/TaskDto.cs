@@ -1,0 +1,23 @@
+namespace DemoApp.Api.DTOs;
+
+/// <summary>
+/// Data transfer object for task data returned from the API.
+/// Never return the domain model directly from a controller endpoint.
+/// </summary>
+public class TaskDto
+{
+    /// <summary>Gets or sets the unique identifier.</summary>
+    public string Id { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the task title.</summary>
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the task description.</summary>
+    public string Description { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets whether the task is completed.</summary>
+    public bool Completed { get; set; }
+
+    /// <summary>Gets or sets the UTC creation timestamp.</summary>
+    public DateTime CreatedAt { get; set; }
+}

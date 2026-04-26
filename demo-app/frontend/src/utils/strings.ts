@@ -1,0 +1,12 @@
+export const APP_TITLE = 'Task Manager';
+export const LABEL_TOGGLE_TO_DARK = 'Switch to dark mode';
+export const LABEL_TOGGLE_TO_LIGHT = 'Switch to light mode';
+export const LABEL_DARK_MODE = 'Dark mode';
+export const LABEL_LIGHT_MODE = 'Light mode';
+export const LABEL_COMPLETED = 'Completed';
+export const LABEL_LOADING = 'Loading tasks...';
+export const LABEL_NO_TASKS = 'No tasks found.';
+export const LABEL_TASKS_HEADING = 'Tasks';
+export const LABEL_RETRY_ARIA = 'Retry loading tasks';
+export const LABEL_RETRY = 'Retry';
+export const LABEL_ERROR_PREFIX = 'Error: ';
