@@ -12,6 +12,9 @@ load_dotenv()
 # ADO REST API version used across all endpoints
 _API_VERSION = "7.1"
 
+# The comments endpoint requires a preview API version
+_API_VERSION_COMMENTS = "7.1-preview"
+
 # API path segments — one constant per endpoint group
 _ENDPOINT_PROJECTS = "_apis/projects"
 _ENDPOINT_WIQL = "_apis/wit/wiql"
@@ -208,7 +211,7 @@ class ADOClient:
             url,
             json={"text": comment_text},
             headers=self._auth_headers,
-            params=self._params(),
+            params={"api-version": _API_VERSION_COMMENTS},
             timeout=_REQUEST_TIMEOUT,
         )
         self._raise_for_error(response, f"Failed to add comment to work item {item_id}")

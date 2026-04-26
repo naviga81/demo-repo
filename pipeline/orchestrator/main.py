@@ -23,8 +23,9 @@ _ORCHESTRATOR_DIR = Path(__file__).resolve().parent
 _PIPELINE_DIR = _ORCHESTRATOR_DIR.parent
 _ADO_MCP_DIR = _PIPELINE_DIR / "mcp-servers" / "ado-mcp"
 _UTILS_DIR = _PIPELINE_DIR / "utils"
+_AGENTS_DIR = _PIPELINE_DIR / "agents"
 
-for _dir in (_PIPELINE_DIR, _ORCHESTRATOR_DIR, _ADO_MCP_DIR, _UTILS_DIR):
+for _dir in (_PIPELINE_DIR, _ORCHESTRATOR_DIR, _ADO_MCP_DIR, _UTILS_DIR, _AGENTS_DIR):
     if str(_dir) not in sys.path:
         sys.path.insert(0, str(_dir))
 
@@ -34,6 +35,7 @@ from contracts.pipeline_run import AgentRunRecord, PipelineRun, PipelineState  #
 from diagnosis import format_retry_context, run_diagnosis  # noqa: E402
 from run_record import RunRecordManager  # noqa: E402
 from state_machine import InvalidTransitionError, StateMachine  # noqa: E402
+import clarification_agent  # noqa: E402
 
 POLL_INTERVAL_SECONDS: int = int(
     os.environ.get("ADO_WORK_ITEM_POLL_INTERVAL_SECONDS", "60")
@@ -385,9 +387,50 @@ class Orchestrator:
     # -------------------------------------------------------------------------
 
     def _run_clarification(self, run: PipelineRun, work_item: dict[str, Any]) -> bool:
-        """Clarification Agent stub."""
-        print(f"{LOG_PREFIX} phase=clarification status=starting")
-        print(f"{LOG_PREFIX} phase=clarification status=complete (placeholder)")
+        """Invoke the Clarification Agent and gate the pipeline on the confidence score."""
+        work_item_id = str(work_item.get("id", "unknown"))
+        print(f"{LOG_PREFIX} phase=clarification status=starting work_item={work_item_id}")
+
+        result = clarification_agent.run(work_item, self.anthropic_client)
+        run.clarification_output = result
+
+        score = result.confidence_score
+        print(f"{LOG_PREFIX} phase=clarification confidence_score={score}")
+
+        if score < 50:
+            questions = result.questions or []
+            questions_text = "\n".join(f"{i}. {q}" for i, q in enumerate(questions, 1))
+            comment = (
+                f"[AI Pipeline] Clarification required (confidence score: {score}/100).\n\n"
+                f"The following information is needed before this work item can enter the pipeline:\n\n"
+                f"{questions_text}"
+            )
+            self._post_ado_comment(work_item_id, comment)
+            try:
+                self.ado_client.update_work_item(int(work_item_id), {"System.State": "Needs Info"})
+            except Exception as exc:
+                print(f"{LOG_PREFIX} warning: could not set ADO state to Needs Info — {exc}")
+            print(
+                f"{LOG_PREFIX} phase=clarification HALTED "
+                f"confidence_score={score} — requirement too vague to proceed"
+            )
+            return False
+
+        if result.questions:
+            questions_text = "\n".join(f"{i}. {q}" for i, q in enumerate(result.questions, 1))
+            comment = (
+                f"[AI Pipeline] Proceeding with partial confidence (score: {score}/100).\n\n"
+                f"The following questions have been noted for the Product Owner:\n\n"
+                f"{questions_text}"
+            )
+            self._post_ado_comment(work_item_id, comment)
+
+        if result.spec and result.spec.gaps:
+            print(
+                f"{LOG_PREFIX} phase=clarification "
+                f"gaps={len(result.spec.gaps)} partial_confidence={result.spec.partial_confidence}"
+            )
+        print(f"{LOG_PREFIX} phase=clarification status=complete confidence_score={score}")
         return True
 
     def _run_story_writer(self, run: PipelineRun, work_item: dict[str, Any]) -> bool:
