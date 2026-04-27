@@ -102,6 +102,26 @@ def run(
     print(f"{_LOG_PREFIX} reading existing backend files")
     existing_files = _read_existing_files(lld)
 
+    backend_files_to_create = [f for f in lld.files_to_create if f.startswith(_BACKEND_ROOT)]
+    backend_files_to_modify = [f for f in lld.files_to_modify if f.startswith(_BACKEND_ROOT)]
+    nothing_to_do = (
+        not lld.backend_changes.endpoints
+        and not backend_files_to_create
+        and not backend_files_to_modify
+    )
+    if nothing_to_do:
+        print(f"{_LOG_PREFIX} no backend changes required by LLD — skipping code generation")
+        return ChangeSummary(
+            agent_type=AgentType.backend,
+            work_item_id=work_item_id,
+            files_modified=[],
+            files_created=[],
+            self_review=SelfReviewResult(violations_found=[], violations_fixed=[], clean=True),
+            dependencies_added=[],
+            api_contract_validation="No backend changes required.",
+            branch_name=branch_name,
+        )
+
     system_prompt = _load_system_prompt()
     user_message = _build_code_gen_message(lld, structured_spec, frontend_summary, existing_files)
 
