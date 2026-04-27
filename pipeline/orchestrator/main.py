@@ -34,9 +34,10 @@ from contracts.diagnosis_result import DiagnosisResult  # noqa: E402
 from contracts.pipeline_run import AgentRunRecord, PipelineRun, PipelineState  # noqa: E402
 from diagnosis import format_retry_context, run_diagnosis  # noqa: E402
 from run_record import RunRecordManager  # noqa: E402
-from state_machine import InvalidTransitionError, StateMachine  # noqa: E402
+from state_machine import StateMachine  # noqa: E402
 import clarification_agent  # noqa: E402
 import story_writer_agent  # noqa: E402
+import spec_agent  # noqa: E402
 
 POLL_INTERVAL_SECONDS: int = int(
     os.environ.get("ADO_WORK_ITEM_POLL_INTERVAL_SECONDS", "60")
@@ -465,9 +466,32 @@ class Orchestrator:
         return True
 
     def _run_spec_agent(self, run: PipelineRun, work_item: dict[str, Any]) -> bool:
-        """Spec Agent stub."""
-        print(f"{LOG_PREFIX} phase=spec_agent status=starting")
-        print(f"{LOG_PREFIX} phase=spec_agent status=complete (placeholder)")
+        """Invoke the Spec Agent to produce a Low Level Design document."""
+        work_item_id = str(work_item.get("id", "unknown"))
+        print(f"{LOG_PREFIX} phase=spec_agent status=starting work_item={work_item_id}")
+
+        if run.clarification_output is None or run.clarification_output.spec is None:
+            raise RuntimeError(
+                "Spec Agent: clarification_output.spec is None — "
+                "clarification phase did not complete successfully"
+            )
+
+        lld = spec_agent.run(
+            run.clarification_output.spec,
+            run.story_ids,
+            work_item,
+            self.anthropic_client,
+            self.ado_client,
+        )
+        run.lld_document = lld
+
+        print(
+            f"{LOG_PREFIX} phase=spec_agent "
+            f"files_to_create={len(lld.files_to_create)} "
+            f"files_to_modify={len(lld.files_to_modify)} "
+            f"frontend_components_to_create={len(lld.frontend_changes.components_to_create)} "
+            f"backend_endpoints={len(lld.backend_changes.endpoints)}"
+        )
         return True
 
     def _run_frontend_agent(self, run: PipelineRun, work_item: dict[str, Any]) -> bool:
