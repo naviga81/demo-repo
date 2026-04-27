@@ -36,11 +36,12 @@ from diagnosis import format_retry_context, run_diagnosis  # noqa: E402
 from run_record import RunRecordManager  # noqa: E402
 from state_machine import InvalidTransitionError, StateMachine  # noqa: E402
 import clarification_agent  # noqa: E402
+import story_writer_agent  # noqa: E402
 
 POLL_INTERVAL_SECONDS: int = int(
     os.environ.get("ADO_WORK_ITEM_POLL_INTERVAL_SECONDS", "60")
 )
-TRIGGER_TAG: str = os.environ.get("ADO_TRIGGER_TAG", "ai-pipeline")
+TRIGGER_TAG: str = os.environ.get("ADO_TRIGGER_TAG", "ai-pipeline-trigger")
 TRIGGER_STATES: list[str] = ["New"]
 TRIGGER_TYPES: list[str] = ["User Story", "Feature"]
 MAX_AGENT_RETRIES: int = 2
@@ -132,6 +133,10 @@ class Orchestrator:
 
         run = self.run_record_manager.create(work_item_id, title)
         self._post_ado_comment(work_item_id, _PIPELINE_STARTED_COMMENT.format(run_id=run.run_id))
+        try:
+            self.ado_client.update_work_item(int(work_item_id), {"System.State": "Active"})
+        except Exception as exc:
+            print(f"{LOG_PREFIX} warning: could not set ADO state to Active — {exc}")
 
         for phase_name, agent_fn, target_state in self._build_pipeline_steps():
             success = self._execute_agent_phase(
@@ -434,9 +439,29 @@ class Orchestrator:
         return True
 
     def _run_story_writer(self, run: PipelineRun, work_item: dict[str, Any]) -> bool:
-        """Story Writer Agent stub."""
-        print(f"{LOG_PREFIX} phase=story_writer status=starting")
-        print(f"{LOG_PREFIX} phase=story_writer status=complete (placeholder)")
+        """Invoke the Story Writer Agent to decompose the spec into ADO User Stories."""
+        work_item_id = str(work_item.get("id", "unknown"))
+        print(f"{LOG_PREFIX} phase=story_writer status=starting work_item={work_item_id}")
+
+        if run.clarification_output is None or run.clarification_output.spec is None:
+            raise RuntimeError(
+                "Story Writer: clarification_output.spec is None — "
+                "clarification phase did not complete successfully"
+            )
+
+        story_ids = story_writer_agent.run(
+            run.clarification_output.spec,
+            work_item,
+            self.anthropic_client,
+            self.ado_client,
+        )
+        run.story_ids = story_ids
+
+        if not story_ids:
+            print(f"{LOG_PREFIX} phase=story_writer NO stories created — returning False")
+            return False
+
+        print(f"{LOG_PREFIX} phase=story_writer stories_created={len(story_ids)} ids={story_ids}")
         return True
 
     def _run_spec_agent(self, run: PipelineRun, work_item: dict[str, Any]) -> bool:

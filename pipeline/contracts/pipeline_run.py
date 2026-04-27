@@ -110,6 +110,10 @@ class PipelineRun(BaseModel):
         default=None,
         description="Output of the Clarification Agent. Set after the clarification phase completes.",
     )
+    story_ids: list[int] = Field(
+        default_factory=list,
+        description="ADO IDs of the User Stories created by the Story Writer Agent.",
+    )
     lld_document: Optional[LLDDocument] = Field(
         default=None,
         description="Low Level Design document produced by the Spec Agent. Set after the spec phase completes.",
