@@ -30,6 +30,7 @@ for _dir in (_PIPELINE_DIR, _ORCHESTRATOR_DIR, _ADO_MCP_DIR, _UTILS_DIR, _AGENTS
         sys.path.insert(0, str(_dir))
 
 from ado_client import ADOClient, ADOClientError  # noqa: E402
+from contracts.audit_report import MergeRecommendation  # noqa: E402
 from contracts.diagnosis_result import DiagnosisResult  # noqa: E402
 from contracts.pipeline_run import AgentRunRecord, PipelineRun, PipelineState  # noqa: E402
 from diagnosis import format_retry_context, run_diagnosis  # noqa: E402
@@ -41,6 +42,7 @@ import spec_agent  # noqa: E402
 import frontend_agent  # noqa: E402
 import backend_agent  # noqa: E402
 import test_agent  # noqa: E402
+import audit_agent  # noqa: E402
 
 POLL_INTERVAL_SECONDS: int = int(
     os.environ.get("ADO_WORK_ITEM_POLL_INTERVAL_SECONDS", "60")
@@ -598,10 +600,74 @@ class Orchestrator:
         return True
 
     def _run_audit_agent(self, run: PipelineRun, work_item: dict[str, Any]) -> bool:
-        """Audit Agent stub."""
-        print(f"{LOG_PREFIX} phase=audit_agent status=starting")
-        print(f"{LOG_PREFIX} phase=audit_agent status=complete (placeholder)")
-        return True
+        """Invoke the Audit Agent to score all feature-branch changes and gate on the result."""
+        work_item_id = str(work_item.get("id", "unknown"))
+        print(f"{LOG_PREFIX} phase=audit_agent status=starting work_item={work_item_id}")
+
+        if run.frontend_summary is None:
+            raise RuntimeError("Audit Agent: frontend_summary is missing from pipeline run")
+        if run.backend_summary is None:
+            raise RuntimeError("Audit Agent: backend_summary is missing from pipeline run")
+        if run.test_results is None:
+            raise RuntimeError("Audit Agent: test_results is missing from pipeline run")
+        if run.lld_document is None:
+            raise RuntimeError("Audit Agent: lld_document is missing from pipeline run")
+        if run.clarification_output is None or run.clarification_output.spec is None:
+            raise RuntimeError("Audit Agent: structured_spec is missing from pipeline run")
+
+        report = audit_agent.run(
+            run.frontend_summary,
+            run.backend_summary,
+            run.test_results,
+            run.lld_document,
+            run.clarification_output.spec,
+            self.anthropic_client,
+        )
+        run.audit_report = report
+
+        cats = report.categories
+        all_findings = (
+            cats.code_correctness.findings
+            + cats.standards_compliance.findings
+            + cats.test_coverage.findings
+            + cats.security.findings
+            + cats.spec_adherence.findings
+            + cats.performance.findings
+            + cats.documentation.findings
+        )
+        findings_lines = [f"- {f.description}" for f in all_findings[:10]]
+        blocking_lines = (
+            [f"- {f.description}" for f in report.blocking_findings]
+            if report.blocking_findings else ["- none"]
+        )
+        comment_lines = [
+            "[AI Pipeline] Audit Report",
+            f"Composite Score: {report.composite_score}/10.0 | Recommendation: {report.merge_recommendation.value}",
+            "",
+            "Category Scores:",
+            f"- Code Correctness: {cats.code_correctness.score}/{cats.code_correctness.max_score}",
+            f"- Standards Compliance: {cats.standards_compliance.score}/{cats.standards_compliance.max_score}",
+            f"- Test Coverage: {cats.test_coverage.score}/{cats.test_coverage.max_score}",
+            f"- Security: {cats.security.score}/{cats.security.max_score}",
+            f"- Spec Adherence: {cats.spec_adherence.score}/{cats.spec_adherence.max_score}",
+            f"- Performance: {cats.performance.score}/{cats.performance.max_score}",
+            f"- Documentation: {cats.documentation.score}/{cats.documentation.max_score}",
+            "",
+            "Findings:",
+            *(findings_lines if findings_lines else ["- none"]),
+            "",
+            "Blocking Findings:",
+            *blocking_lines,
+        ]
+        self._post_ado_comment(work_item_id, "\n".join(comment_lines))
+
+        print(
+            f"{LOG_PREFIX} phase=audit_agent "
+            f"composite_score={report.composite_score:.2f} "
+            f"merge_recommendation={report.merge_recommendation.value} "
+            f"blocking_findings={len(report.blocking_findings)}"
+        )
+        return report.merge_recommendation != MergeRecommendation.reject
 
     def _run_supervisor(self, run: PipelineRun, work_item: dict[str, Any]) -> bool:
         """Supervisor Agent stub."""
