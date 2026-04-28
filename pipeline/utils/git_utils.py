@@ -57,7 +57,6 @@ def create_feature_branch(work_item_id: str, slug: str) -> str:
     branch_name = f"{_BRANCH_PREFIX}/{work_item_id}-{slug}"
     repo_root = get_repo_root()
     run_git(["checkout", _MAIN_BRANCH], cwd=repo_root)
-    run_git(["pull", _ORIGIN, _MAIN_BRANCH], cwd=repo_root)
     existing = run_git(["branch", "--list", branch_name], cwd=repo_root).strip()
     if existing:
         run_git(["checkout", branch_name], cwd=repo_root)
