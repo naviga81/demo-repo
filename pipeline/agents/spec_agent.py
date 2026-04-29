@@ -192,6 +192,16 @@ def _call_claude(
         ) from exc
 
 
+def _normalize_endpoint(ep: dict[str, Any]) -> dict[str, Any]:
+    """Ensure request_body and response_body are dicts, not strings."""
+    ep = dict(ep)
+    for field in ("request_body", "response_body"):
+        val = ep.get(field)
+        if isinstance(val, str):
+            ep[field] = {"description": val}
+    return ep
+
+
 def _build_lld_document(raw: dict[str, Any], work_item_id: str) -> LLDDocument:
     """Construct a validated LLDDocument from the raw Claude response dict.
 
@@ -212,7 +222,7 @@ def _build_lld_document(raw: dict[str, Any], work_item_id: str) -> LLDDocument:
                 props_interfaces=fe.get("props_interfaces") or [],
             ),
             backend_changes=BackendChanges(
-                endpoints=[EndpointDefinition(**ep) for ep in be.get("endpoints") or []],
+                endpoints=[EndpointDefinition(**_normalize_endpoint(ep)) for ep in be.get("endpoints") or []],
                 services=be.get("services") or [],
                 data_models=be.get("data_models") or [],
                 dto_changes=be.get("dto_changes") or [],
