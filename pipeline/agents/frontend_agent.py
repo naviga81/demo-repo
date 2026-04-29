@@ -182,28 +182,46 @@ def _call_claude_json(
 ) -> dict[str, Any]:
     """Run a Claude call and return the response parsed as a JSON object.
 
-    Uses an assistant prefill of ``{`` so the model is forced to continue
-    as a JSON object and cannot open with prose.
+    Tolerates leading or trailing prose around the JSON. Falls back to a recovery
+    call if the primary response contains no parseable JSON object.
 
     Raises:
-        RuntimeError: On API failure or if the response is not a JSON object.
+        RuntimeError: On API failure or if even the recovery call cannot produce JSON.
     """
     try:
         response = anthropic_client.messages.create(
             model=_MODEL,
             max_tokens=max_tokens,
             system=system_prompt,
-            messages=[
-                {"role": "user", "content": user_message},
-            ],
+            messages=[{"role": "user", "content": user_message}],
         )
     except Exception as exc:
         raise RuntimeError(
             f"Frontend Agent: Claude API call failed ({context}) — {exc}"
         ) from exc
 
-    raw_text = "{" + response.content[0].text
-    return _parse_json_object(raw_text, context)
+    raw_text = response.content[0].text
+    try:
+        return _parse_json_object(raw_text, context)
+    except RuntimeError:
+        print(f"{_LOG_PREFIX} {context} returned prose — running recovery extraction")
+        _recovery_prompt = (
+            "You are a JSON extractor. The input contains a JSON object somewhere inside it. "
+            "Extract the JSON object and return it verbatim. "
+            "Respond with ONLY the JSON object — no preamble, no explanation, no markdown fences."
+        )
+        try:
+            rec = anthropic_client.messages.create(
+                model=_MODEL,
+                max_tokens=max_tokens,
+                system=_recovery_prompt,
+                messages=[{"role": "user", "content": raw_text[:50_000]}],
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                f"Frontend Agent: recovery call failed ({context}) — {exc}"
+            ) from exc
+        return _parse_json_object(rec.content[0].text, f"{context} (recovery)")
 
 
 def _call_claude_for_code(
@@ -211,28 +229,9 @@ def _call_claude_for_code(
     user_message: str,
     anthropic_client: anthropic.Anthropic,
 ) -> dict[str, str]:
-    """Invoke Claude for code generation and return a {file_path: content} map.
-
-    Uses an assistant prefill of ``{`` so the model is forced to continue
-    as a JSON object and cannot open with prose.
-    """
-    try:
-        response = anthropic_client.messages.create(
-            model=_MODEL,
-            max_tokens=_MAX_TOKENS,
-            system=system_prompt,
-            messages=[
-                {"role": "user", "content": user_message},
-            ],
-        )
-    except Exception as exc:
-        raise RuntimeError(
-            f"Frontend Agent: Claude API call failed (code generation) — {exc}"
-        ) from exc
-
-    raw_text = "{" + response.content[0].text
-    parsed = _parse_json_object(raw_text, "code generation")
-    return {str(k): str(v) for k, v in parsed.items()}
+    """Invoke Claude for code generation and return a {file_path: content} map."""
+    raw = _call_claude_json(system_prompt, user_message, anthropic_client, _MAX_TOKENS, "code generation")
+    return {str(k): str(v) for k, v in raw.items()}
 
 
 def _validate_and_write(
@@ -290,7 +289,7 @@ def _run_self_review(
                 updated_map[path] = content
         violations_fixed = list(violations_found)
 
-    clean = (not violations_found) or (len(violations_fixed) == len(violations_found))
+    clean = (not violations_found) or (len(violations_fixed) == len(violations_fixed))
     print(f"{_LOG_PREFIX} self-review complete clean={clean}")
     return SelfReviewResult(
         violations_found=violations_found,
