@@ -7,6 +7,7 @@ import {
   LABEL_TOGGLE_TO_LIGHT,
 } from '../utils/strings';
 import { ThemeIcon } from './ThemeIcon';
+import { WeatherWidget } from './WeatherWidget';
 
 export function Header() {
   const { theme, toggleTheme } = useTheme();
@@ -16,6 +17,7 @@ export function Header() {
     <header className="bg-white dark:bg-gray-800 shadow-sm px-6 py-4 flex items-center justify-between">
       <h1 className="text-xl font-semibold text-gray-900 dark:text-white">{APP_TITLE}</h1>
       <div className="flex items-center gap-2">
+        <WeatherWidget />
         <ThemeIcon isDark={isDark} />
         <button
           aria-label={isDark ? LABEL_TOGGLE_TO_LIGHT : LABEL_TOGGLE_TO_DARK}

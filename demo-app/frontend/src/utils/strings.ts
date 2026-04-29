@@ -21,3 +21,7 @@ export const LABEL_TITLE_REQUIRED = 'Title is required.';
 export const LABEL_SUBMIT_ERROR = 'Failed to create task. Please try again.';
 export const LABEL_TITLE_PLACEHOLDER = 'Enter task title';
 export const LABEL_DESCRIPTION_PLACEHOLDER = 'Enter task description (optional)';
+
+export const LABEL_WEATHER_LOADING = 'Loading weather...';
+export const LABEL_WEATHER_ERROR = 'Weather unavailable';
+export const LABEL_WEATHER_ARIA = 'Current weather';
