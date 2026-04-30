@@ -9,6 +9,7 @@ import {
   LABEL_DUE_DATE,
   LABEL_SUBMIT_ERROR,
   LABEL_TASK_FORM_HEADING,
+  LABEL_TASK_FORM_HEADING_ICON_ARIA,
   LABEL_TITLE,
   LABEL_TITLE_PLACEHOLDER,
   LABEL_TITLE_REQUIRED,
@@ -81,8 +82,19 @@ export function TaskForm({ onTaskCreated }: TaskFormProps) {
 
   return (
     <section className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
+      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
         {LABEL_TASK_FORM_HEADING}
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          className="w-[1em] h-[1em]"
+          aria-label={LABEL_TASK_FORM_HEADING_ICON_ARIA}
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path d="M21.731 2.269a2.625 2.625 0 0 0-3.712 0l-1.157 1.157 3.712 3.712 1.157-1.157a2.625 2.625 0 0 0 0-3.712ZM19.513 8.199l-3.712-3.712-8.4 8.4a5.25 5.25 0 0 0-1.32 2.214l-.8 2.685a.75.75 0 0 0 .933.933l2.685-.8a5.25 5.25 0 0 0 2.214-1.32l8.4-8.4Z" />
+        </svg>
       </h2>
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
