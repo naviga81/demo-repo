@@ -33,3 +33,6 @@ export const LABEL_COMPLETE_ERROR = 'Failed to mark task as complete. Please try
 
 export const LABEL_FETCH_TASKS_ERROR_PREFIX = 'Failed to fetch tasks: ';
 export const LABEL_UNKNOWN_ERROR = 'Unknown error';
+
+export const LABEL_LOAD_MORE = 'Load More';
+export const LABEL_LOAD_MORE_ARIA = 'Load more upcoming tasks';

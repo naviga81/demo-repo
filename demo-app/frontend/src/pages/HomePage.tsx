@@ -1,6 +1,7 @@
 import { TaskCard } from '../components/TaskCard';
 import { TaskForm } from '../components/TaskForm';
-import { useTasks } from '../hooks/useTasks';
+import { LoadMoreButton } from '../components/LoadMoreButton';
+import { useUpcomingTasks } from '../hooks/useUpcomingTasks';
 import type { Task } from '../types';
 import {
   LABEL_COMPLETE_ERROR,
@@ -13,7 +14,17 @@ import {
 } from '../utils/strings';
 
 export function HomePage() {
-  const { tasks, loading, error, completeError, refetch, addTask, completeTask } = useTasks();
+  const {
+    visibleTasks,
+    hasMore,
+    loading,
+    error,
+    completeError,
+    refetch,
+    addTask,
+    completeTask,
+    loadMore,
+  } = useUpcomingTasks();
 
   const handleTaskCreated = (task: Task) => {
     addTask(task);
@@ -56,17 +67,18 @@ export function HomePage() {
           {LABEL_COMPLETE_ERROR}
         </p>
       )}
-      {tasks.length === 0 ? (
+      {visibleTasks.length === 0 ? (
         <p className="text-gray-500 dark:text-gray-400">{LABEL_NO_TASKS}</p>
       ) : (
         <ul className="flex flex-col gap-3">
-          {tasks.map((task) => (
+          {visibleTasks.map((task) => (
             <li key={task.id}>
               <TaskCard task={task} onComplete={completeTask} />
             </li>
           ))}
         </ul>
       )}
+      <LoadMoreButton onClick={loadMore} visible={hasMore} />
     </main>
   );
 }
