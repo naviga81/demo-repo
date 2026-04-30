@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { WeatherWidget } from '../components/WeatherWidget';
 import * as useWeatherModule from '../hooks/useWeather';
 
@@ -8,7 +8,20 @@ describe('WeatherWidget', () => {
     vi.restoreAllMocks();
   });
 
-  it('render test - displays loading text when weather is loading', () => {
+  it('render test - renders the weather condition and its corresponding icon when data is available', () => {
+    vi.spyOn(useWeatherModule, 'useWeather').mockReturnValue({
+      weather: { condition: 'sunny', icon: 'sunny' },
+      loading: false,
+      error: null,
+    });
+
+    render(<WeatherWidget />);
+
+    expect(screen.getByText('sunny')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'sunny' })).toBeInTheDocument();
+  });
+
+  it('interaction test - displays the loading label while weather data is being fetched', () => {
     vi.spyOn(useWeatherModule, 'useWeather').mockReturnValue({
       weather: null,
       loading: true,
@@ -20,20 +33,7 @@ describe('WeatherWidget', () => {
     expect(screen.getByText('Loading weather...')).toBeInTheDocument();
   });
 
-  it('interaction test - displays condition text when weather data is available', () => {
-    vi.spyOn(useWeatherModule, 'useWeather').mockReturnValue({
-      weather: { condition: 'Sunny', icon: '☀️' },
-      loading: false,
-      error: null,
-    });
-
-    render(<WeatherWidget />);
-
-    expect(screen.getByText('Sunny')).toBeInTheDocument();
-    expect(screen.getByText('☀️')).toBeInTheDocument();
-  });
-
-  it('edge case - displays error text when error is present and does not crash', () => {
+  it('edge case - displays the error label when weather is null and error is present', () => {
     vi.spyOn(useWeatherModule, 'useWeather').mockReturnValue({
       weather: null,
       loading: false,

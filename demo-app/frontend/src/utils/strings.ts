@@ -25,6 +25,7 @@ export const LABEL_DESCRIPTION_PLACEHOLDER = 'Enter task description (optional)'
 export const LABEL_WEATHER_LOADING = 'Loading weather...';
 export const LABEL_WEATHER_ERROR = 'Weather unavailable';
 export const LABEL_WEATHER_ARIA = 'Current weather';
+export const LABEL_WEATHER_ICON_ARIA = 'Weather condition icon';
 
 export const LABEL_MARK_COMPLETE = 'Mark Complete';
 export const LABEL_MARK_COMPLETE_ARIA = 'Mark task as complete';

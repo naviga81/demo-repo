@@ -4,6 +4,7 @@ import {
   LABEL_WEATHER_ERROR,
   LABEL_WEATHER_ARIA,
 } from '../utils/strings';
+import { WeatherIcon } from './WeatherIcon';
 
 export interface WeatherWidgetProps {
   className?: string;
@@ -39,7 +40,7 @@ export function WeatherWidget({ className = '' }: WeatherWidgetProps) {
       aria-label={`${LABEL_WEATHER_ARIA}: ${weather.condition}`}
       className={`flex items-center gap-1 text-sm text-gray-700 dark:text-gray-200 ${className}`}
     >
-      <span aria-hidden="true">{weather.icon}</span>
+      <WeatherIcon condition={weather.condition} />
       <span>{weather.condition}</span>
     </div>
   );
