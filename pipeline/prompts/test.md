@@ -45,6 +45,7 @@ You receive a JSON object with these keys:
 - Use `@testing-library/user-event` for interaction tests.
 - Use `describe` blocks to group tests by component or hook.
 - Test file names must match the source file suffixed with `.test.tsx` or `.test.ts`.
+- **Child component mock / duplicate text rule:** When you mock a child component so it renders prop values as visible text (e.g., `<span data-testid="weather-icon">{condition}</span>`), the mocked element AND the parent component may both render the same text string. NEVER use `getByText(thatString)` in this case — it will fail with "found multiple elements". Instead: use `getByTestId('...')` to locate the mocked child, and use `getAllByText(thatString)` (not `getByText`) when asserting the text appears anywhere. The same rule applies to any mock whose render output duplicates a string the parent also renders.
 
 ### Backend Tests — one file per service or controller changed
 
