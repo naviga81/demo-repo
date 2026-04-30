@@ -44,30 +44,33 @@
                             ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                     ORCHESTRATOR AGENT                              │
-│   • Polls ADO via MCP for new work items with status = "New"        │
+│   • Polls ADO via MCP for work items tagged ai-pipeline-trigger     │
 │   • Triggers the Clarification Step                                 │
-│   • On pass: decomposes into User Stories, updates ADO board        │
-│   • On fail: writes clarification comment back to ADO item          │
+│   • score >= 80: decomposes into User Stories, updates ADO board    │
+│   • score < 80: posts questions, pauses, waits for human reply      │
 │   • Drives the full agent pipeline sequentially                     │
 └──────┬──────────────────────────────────────────────────────────────┘
        │
-       │  1. Clarification check passes
+       │  1. Work item picked up
        ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    CLARIFICATION STEP                               │
-│   Evaluates whether the requirement is specific enough to act on.   │
-│   Produces: PASS (with structured spec) or FAIL (with questions)    │
+│   Scores the requirement 0–100.                                     │
+│   score >= 80 → PASS, continue immediately                         │
+│   score < 80  → post questions to ADO, set state = Needs Info,     │
+│                 block + poll; re-evaluate on each new human comment │
+│                 loop until score reaches 80, then resume            │
 └──────┬──────────────────────────────────────────────────────────────┘
        │
-       │  2. ADO board updated with User Stories
+       │  2. Score reached 80 — ADO board updated with User Stories
        ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         SPEC AGENT                                  │
 │   Translates stories + structured spec into a Low Level Design      │
-│   Produces: LLD JSON document attached to ADO as a comment          │
+│   Produces: LLD JSON → ADO comment + outputs/_LLD.md               │
 └──────┬──────────────────────────────────────────────────────────────┘
        │
-       │  3. LLD document produced; code agents receive blueprint
+       │  3. LLD written to outputs/_LLD.md; code agents receive blueprint
        ▼
 ┌──────────────────────────────┐   ┌──────────────────────────────────┐
 │    FRONTEND AGENT            │   │        BACKEND AGENT             │
@@ -82,9 +85,11 @@
                │           TEST AGENT               │
                │  Writes unit + integration tests   │
                │  Runs the test suite               │
-               │  Reports pass/fail + coverage      │
+               │  Self-corrects failing tests       │
+               │  (up to 3 attempts per file)       │
+               │  Writes outputs/_TestResults.md    │
                └────────────────┬───────────────────┘
-                                │  5. Test results attached to run
+                                │  5. Test results → outputs/_TestResults.md
                                 ▼
                ┌────────────────────────────────────┐
                │           AUDIT AGENT              │
