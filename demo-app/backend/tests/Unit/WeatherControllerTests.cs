@@ -21,7 +21,7 @@ public sealed class WeatherControllerTests
     [Fact]
     public async Task GetCurrentWeather_ServiceReturnsWeather_Returns200WithWeatherDto()
     {
-        var weatherDto = new WeatherDto { Condition = "Sunny", Icon = "sunny" };
+        var weatherDto = new WeatherDto { Condition = "Sunny", Icon = "sunny", TemperatureFahrenheit = 85.0 };
         _mockService
             .Setup(s => s.GetCurrentWeatherAsync())
             .ReturnsAsync(weatherDto);
@@ -33,6 +33,24 @@ public sealed class WeatherControllerTests
         var dto = Assert.IsType<WeatherDto>(okResult.Value);
         Assert.Equal("Sunny", dto.Condition);
         Assert.Equal("sunny", dto.Icon);
+        Assert.Equal(85.0, dto.TemperatureFahrenheit);
+    }
+
+    [Fact]
+    public async Task GetCurrentWeather_ServiceReturnsWeatherWithNullTemperature_Returns200WithNullTemperature()
+    {
+        var weatherDto = new WeatherDto { Condition = "Cloudy", Icon = "cloudy", TemperatureFahrenheit = null };
+        _mockService
+            .Setup(s => s.GetCurrentWeatherAsync())
+            .ReturnsAsync(weatherDto);
+
+        var result = await _sut.GetCurrentWeather();
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(200, okResult.StatusCode);
+        var dto = Assert.IsType<WeatherDto>(okResult.Value);
+        Assert.Equal("Cloudy", dto.Condition);
+        Assert.Null(dto.TemperatureFahrenheit);
     }
 
     [Fact]

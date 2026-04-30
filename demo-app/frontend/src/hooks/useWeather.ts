@@ -4,6 +4,7 @@ import { WEATHER_API_URL } from '../utils/constants';
 interface WeatherData {
   condition: string;
   icon: string;
+  temperature_f?: number;
 }
 
 interface UseWeatherResult {

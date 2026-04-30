@@ -14,4 +14,9 @@ public class WeatherDto
     /// Gets or sets the icon identifier representing the current weather condition.
     /// </summary>
     public string Icon { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the current temperature in Fahrenheit, or null if unavailable.
+    /// </summary>
+    public double? TemperatureFahrenheit { get; set; }
 }

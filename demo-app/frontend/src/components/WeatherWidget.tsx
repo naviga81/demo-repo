@@ -6,8 +6,17 @@ import {
 } from '../utils/strings';
 import { WeatherIcon } from './WeatherIcon';
 
+const FAHRENHEIT_SUFFIX = '\u00b0F';
+
 export interface WeatherWidgetProps {
   className?: string;
+}
+
+function buildWeatherLabel(condition: string, temperatureF?: number): string {
+  if (temperatureF !== undefined && temperatureF !== null) {
+    return `${condition} ${temperatureF}${FAHRENHEIT_SUFFIX}`;
+  }
+  return condition;
 }
 
 export function WeatherWidget({ className = '' }: WeatherWidgetProps) {
@@ -35,13 +44,15 @@ export function WeatherWidget({ className = '' }: WeatherWidgetProps) {
     );
   }
 
+  const displayText = buildWeatherLabel(weather.condition, weather.temperature_f);
+
   return (
     <div
-      aria-label={`${LABEL_WEATHER_ARIA}: ${weather.condition}`}
+      aria-label={`${LABEL_WEATHER_ARIA}: ${displayText}`}
       className={`flex items-center gap-1 text-sm text-gray-700 dark:text-gray-200 ${className}`}
     >
       <WeatherIcon condition={weather.condition} />
-      <span>{weather.condition}</span>
+      <span>{displayText}</span>
     </div>
   );
 }
