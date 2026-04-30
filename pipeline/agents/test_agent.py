@@ -144,9 +144,8 @@ Read the test file content and source files carefully. \
 Fix ONLY the test file to match the actual source code — do not modify source files. \
 Common issues: wrong import style (default vs named), wrong property names, \
 wrong mock setup, wrong expected values. \
-Respond with only the corrected TypeScript file content. \
-No JSON wrapper, no markdown fences, no explanation. \
-Output the raw TypeScript file content only.\
+Respond ONLY with a valid JSON object — no preamble, no explanation, no markdown fences: \
+{"corrected_content": "<complete corrected TypeScript file content>"}\
 """
 
 _BACKEND_SINGLE_FILE_CORRECTION_PROMPT = """\
@@ -155,9 +154,8 @@ Read the test file content and source files carefully. \
 Fix ONLY the test file to match the actual source code — do not modify source files. \
 Common issues: wrong constructor arguments, wrong method names, \
 wrong expected values, missing using statements. \
-Respond with only the corrected C# file content. \
-No JSON wrapper, no markdown fences, no explanation. \
-Output the raw C# file content only.\
+Respond ONLY with a valid JSON object — no preamble, no explanation, no markdown fences: \
+{"corrected_content": "<complete corrected C# file content>"}\
 """
 
 
@@ -309,7 +307,10 @@ def _correct_frontend_tests(
                 print(f"{_LOG_PREFIX} warning: correction call failed for {rel_path} — {exc}")
                 continue
 
-            corrected = _strip_fences(response.content[0].text.strip())
+            corrected = _extract_corrected_content(response.content[0].text, rel_path)
+            if corrected is None:
+                print(f"{_LOG_PREFIX} warning: correction for {rel_path} returned no parseable code — skipping")
+                continue
             git_utils.write_file(rel_path, corrected)
             git_utils.commit_changes([rel_path], f"[auto-fix] correct test: {rel_path}")
             any_fixed = True
@@ -383,7 +384,10 @@ def _correct_backend_tests(
                 print(f"{_LOG_PREFIX} warning: correction call failed for {rel_path} — {exc}")
                 continue
 
-            corrected = _strip_fences(response.content[0].text.strip())
+            corrected = _extract_corrected_content(response.content[0].text, rel_path)
+            if corrected is None:
+                print(f"{_LOG_PREFIX} warning: correction for {rel_path} returned no parseable code — skipping")
+                continue
             git_utils.write_file(rel_path, corrected)
             git_utils.commit_changes([rel_path], f"[auto-fix] correct test: {rel_path}")
             any_fixed = True
@@ -400,6 +404,30 @@ def _correct_backend_tests(
             break
 
     return best
+
+
+def _extract_corrected_content(raw_text: str, context: str) -> str | None:
+    """Extract the corrected file content from a Claude correction response.
+
+    Expects JSON {"corrected_content": "..."} but tolerates leading/trailing prose.
+    Returns None if no valid content can be extracted, so the caller can skip the
+    write rather than persisting prose or garbage into a source file.
+    """
+    text = _strip_fences(raw_text)
+    decoder = json.JSONDecoder()
+    for start in (0, text.find("{")):
+        if start == -1:
+            continue
+        try:
+            parsed, _ = decoder.raw_decode(text[start:].lstrip())
+            if isinstance(parsed, dict) and "corrected_content" in parsed:
+                content = parsed["corrected_content"]
+                if isinstance(content, str) and content.strip():
+                    return content
+        except json.JSONDecodeError:
+            pass
+    print(f"{_LOG_PREFIX} warning: could not parse corrected_content JSON for {context}")
+    return None
 
 
 def _make_slug(title: str) -> str:
