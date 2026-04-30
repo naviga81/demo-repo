@@ -1,44 +1,36 @@
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { HomePage } from '../pages/HomePage';
 import * as useUpcomingTasksModule from '../hooks/useUpcomingTasks';
 import type { Task } from '../types';
 
-const makeTask = (id: string): Task => ({
-  id,
-  title: `Task ${id}`,
-  description: `Description ${id}`,
-  completed: false,
-  createdAt: `2024-01-${id.padStart(2, '0')}T10:00:00.000Z`,
-});
+vi.mock('../components/TaskForm', () => ({
+  TaskForm: ({ onTaskCreated }: { onTaskCreated: (t: Task) => void }) => (
+    <div data-testid="task-form" />
+  ),
+}));
 
-const defaultHookValue = {
+vi.mock('../components/TaskCard', () => ({
+  TaskCard: ({ task }: { task: Task }) => (
+    <div data-testid="task-card" />
+  ),
+}));
+
+vi.mock('../components/LoadMoreButton', () => ({
+  LoadMoreButton: () => <div data-testid="load-more-button" />,
+}));
+
+const baseHookReturn = {
   visibleTasks: [] as Task[],
   hasMore: false,
   loading: false,
-  error: null as string | null,
-  completeError: null as string | null,
+  error: null,
+  completeError: null,
   refetch: vi.fn(),
   addTask: vi.fn(),
   completeTask: vi.fn(),
   loadMore: vi.fn(),
 };
-
-vi.mock('../components/TaskForm', () => ({
-  TaskForm: ({ onTaskCreated }: { onTaskCreated: (t: Task) => void }) => (
-    <button onClick={() => onTaskCreated(makeTask('99'))}>Add Task</button>
-  ),
-}));
-
-vi.mock('../components/TaskCard', () => ({
-  TaskCard: ({ task }: { task: Task }) => <div data-testid="task-card">{task.title}</div>,
-}));
-
-vi.mock('../components/LoadMoreButton', () => ({
-  LoadMoreButton: ({ onClick, visible }: { onClick: () => void; visible: boolean }) =>
-    visible ? <button onClick={onClick}>Load More</button> : null,
-}));
 
 describe('HomePage', () => {
   beforeEach(() => {
@@ -49,47 +41,41 @@ describe('HomePage', () => {
     vi.restoreAllMocks();
   });
 
-  it('render test - renders the task list container with max-h-[200px] class when tasks are present', () => {
-    const tasks = [makeTask('1'), makeTask('2')];
+  it('render test - renders the SmileyIcon svg at the bottom of the page', () => {
     vi.spyOn(useUpcomingTasksModule, 'useUpcomingTasks').mockReturnValue({
-      ...defaultHookValue,
-      visibleTasks: tasks,
+      ...baseHookReturn,
     });
 
     render(<HomePage />);
 
-    const list = screen.getByRole('list');
-    expect(list).toBeInTheDocument();
-    expect(list.className).toContain('max-h-[200px]');
-    expect(list.className).toContain('overflow-y-auto');
+    const svg = screen.getByRole('img', { name: 'Smiley face icon' });
+    expect(svg).toBeInTheDocument();
   });
 
-  it('interaction test - calls loadMore when Load More button is clicked', async () => {
-    const loadMore = vi.fn();
+  it('interaction test - SmileyIcon has no click handler or interactive role', () => {
     vi.spyOn(useUpcomingTasksModule, 'useUpcomingTasks').mockReturnValue({
-      ...defaultHookValue,
-      visibleTasks: [makeTask('1')],
-      hasMore: true,
-      loadMore,
+      ...baseHookReturn,
     });
 
     render(<HomePage />);
 
-    const loadMoreButton = screen.getByRole('button', { name: 'Load More' });
-    await userEvent.click(loadMoreButton);
-
-    expect(loadMore).toHaveBeenCalledTimes(1);
+    const svg = screen.getByRole('img', { name: 'Smiley face icon' });
+    expect(svg).not.toHaveAttribute('onClick');
+    expect(svg).not.toHaveAttribute('tabindex');
   });
 
-  it('edge case - renders no-tasks message and no list when visibleTasks is empty', () => {
+  it('edge case - renders the SmileyIcon even when there are no tasks', () => {
     vi.spyOn(useUpcomingTasksModule, 'useUpcomingTasks').mockReturnValue({
-      ...defaultHookValue,
+      ...baseHookReturn,
       visibleTasks: [],
     });
 
     render(<HomePage />);
 
-    expect(screen.getByText('No tasks found.')).toBeInTheDocument();
-    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+    const svg = screen.getByRole('img', { name: 'Smiley face icon' });
+    expect(svg).toBeInTheDocument();
+    expect(svg).toHaveAttribute('width', '15');
+    expect(svg).toHaveAttribute('height', '15');
+    expect(svg).toHaveAttribute('fill', '#FACC15');
   });
 });

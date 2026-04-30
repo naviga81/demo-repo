@@ -1,6 +1,7 @@
 import { TaskCard } from '../components/TaskCard';
 import { TaskForm } from '../components/TaskForm';
 import { LoadMoreButton } from '../components/LoadMoreButton';
+import { SmileyIcon } from '../components/SmileyIcon';
 import { useUpcomingTasks } from '../hooks/useUpcomingTasks';
 import type { Task } from '../types';
 import {
@@ -81,6 +82,9 @@ export function HomePage() {
         </ul>
       )}
       <LoadMoreButton onClick={loadMore} visible={hasMore} />
+      <div className="flex justify-center mt-6">
+        <SmileyIcon />
+      </div>
     </main>
   );
 }
