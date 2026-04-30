@@ -65,11 +65,18 @@ def create_feature_branch(work_item_id: str, slug: str) -> str:
         run_git(["clean", "-fd"], cwd=repo_root)
     except RuntimeError:
         pass
+    run_git(["fetch", _ORIGIN, _MAIN_BRANCH], cwd=repo_root)
     run_git(["checkout", _MAIN_BRANCH], cwd=repo_root)
+    run_git(["reset", "--hard", f"{_ORIGIN}/{_MAIN_BRANCH}"], cwd=repo_root)
     existing = run_git(["branch", "--list", branch_name], cwd=repo_root).strip()
     if existing:
         run_git(["checkout", branch_name], cwd=repo_root)
-        print(f"{_LOG_PREFIX} resumed existing branch {branch_name!r}")
+        run_git(["reset", "--hard", f"{_ORIGIN}/{_MAIN_BRANCH}"], cwd=repo_root)
+        try:
+            run_git(["push", "--force-with-lease", _ORIGIN, branch_name], cwd=repo_root)
+        except RuntimeError:
+            pass
+        print(f"{_LOG_PREFIX} reset existing branch {branch_name!r} to {_ORIGIN}/{_MAIN_BRANCH}")
     else:
         run_git(["checkout", "-b", branch_name], cwd=repo_root)
         print(f"{_LOG_PREFIX} created branch {branch_name!r}")
