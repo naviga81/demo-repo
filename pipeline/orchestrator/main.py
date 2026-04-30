@@ -6,6 +6,7 @@ sequence with checkpointing, intelligent retry backed by the diagnosis step, and
 human escalation when all retries are exhausted.
 """
 
+import json
 import os
 import sys
 import time
@@ -65,6 +66,67 @@ _PIPELINE_HALTED_COMMENT = (
     "All retries failed — human intervention required.<br>"
     "<strong>Run ID:</strong> {run_id}"
 )
+
+_REPO_ROOT = _PIPELINE_DIR.parent
+_TEST_RESULTS_PATH = _REPO_ROOT / "_TestResults.md"
+
+
+def _write_test_results_doc(result: Any, work_item_id: str) -> str:
+    """Write _TestResults.md at the repo root with full per-test detail.
+
+    Returns the filename so callers can reference it in comments.
+    """
+    from contracts.test_results import TestStatus  # local import avoids circular deps
+
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    coverage = result.coverage.line_coverage_percent if result.coverage else 0.0
+    status_label = "PASS" if result.failed == 0 else "FAIL"
+
+    def _case_lines(status: TestStatus) -> list[str]:
+        cases = [tc for tc in result.test_cases if tc.status == status]
+        if not cases:
+            return ["_(none)_"]
+        lines = []
+        for tc in cases:
+            label = tc.name.replace("_", " ")
+            if tc.error_message:
+                lines.append(f"- {label}  \n  _Error: {tc.error_message[:300]}_")
+            else:
+                lines.append(f"- {label}")
+        return lines
+
+    lines: list[str] = [
+        f"# Test Results — Work Item {work_item_id}",
+        "",
+        f"_Generated: {ts}_",
+        "",
+        "---",
+        "",
+        "## Summary",
+        "",
+        "| Metric | Value |",
+        "|---|---|",
+        f"| **Status** | {status_label} |",
+        f"| **Total** | {result.total_tests} |",
+        f"| **Passed** | {result.passed} |",
+        f"| **Failed** | {result.failed} |",
+        f"| **Skipped** | {result.skipped} |",
+        f"| **Coverage** | {coverage:.1f}% |",
+        "",
+        "---",
+        "",
+        "## Failed Tests",
+        "",
+    ]
+    lines.extend(_case_lines(TestStatus.failed))
+    lines += ["", "---", "", "## Passed Tests", ""]
+    lines.extend(_case_lines(TestStatus.passed))
+    lines += ["", "---", "", "## Skipped Tests", ""]
+    lines.extend(_case_lines(TestStatus.skipped))
+    lines.append("")
+
+    _TEST_RESULTS_PATH.write_text("\n".join(lines), encoding="utf-8")
+    return _TEST_RESULTS_PATH.name
 
 
 class Orchestrator:
@@ -740,18 +802,7 @@ class Orchestrator:
         coverage = result.coverage.line_coverage_percent if result.coverage else 0.0
         status_label = "PASS" if result.failed == 0 else "FAIL"
 
-        def _test_items(status_value: str) -> str:
-            cases = [tc for tc in result.test_cases if tc.status.value == status_value]
-            if not cases:
-                return "<li><em>none</em></li>"
-            lines = []
-            for tc in cases:
-                label = tc.name.replace("_", " ")
-                if tc.error_message:
-                    lines.append(f"<li>{label} &mdash; <em>{tc.error_message[:120]}</em></li>")
-                else:
-                    lines.append(f"<li>{label}</li>")
-            return "".join(lines)
+        doc_name = _write_test_results_doc(result, work_item_id)
 
         comment = (
             f"[AI Pipeline] <strong>Tests Complete &mdash; {status_label}</strong><br><br>"
@@ -760,9 +811,7 @@ class Orchestrator:
             f"<strong>Failed:</strong> {result.failed} &nbsp;|&nbsp; "
             f"<strong>Skipped:</strong> {result.skipped} &nbsp;|&nbsp; "
             f"<strong>Coverage:</strong> {coverage:.1f}%<br><br>"
-            f"<strong>Passed Tests:</strong><br><ul>{_test_items('passed')}</ul>"
-            f"<strong>Failed Tests:</strong><br><ul>{_test_items('failed')}</ul>"
-            f"<strong>Skipped Tests:</strong><br><ul>{_test_items('skipped')}</ul>"
+            f"<strong>Full test details:</strong> <code>{doc_name}</code>"
         )
         self._post_ado_comment(work_item_id, comment)
 

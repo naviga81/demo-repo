@@ -159,8 +159,9 @@ TestResults/
 runs/*
 !runs/.gitkeep
 
-# LLD output — generated file, not committed
+# Pipeline-generated documents — not committed
 _LLD.md
+_TestResults.md
 
 # OS
 .DS_Store
