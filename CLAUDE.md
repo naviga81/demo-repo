@@ -97,7 +97,7 @@
                ┌────────────────────────────────────┐
                │        SUPERVISOR AGENT            │
                │  Collects scores from all agents   │
-               │  Checks composite score >= 9/10    │
+               │  Checks composite score >= 8.0     │
                │  PASS → opens + auto-merges PR     │
                │  FAIL → files failure report       │
                └────────────────────────────────────┘
@@ -116,7 +116,8 @@
 | `AUDIT_IN_PROGRESS` | Audit Agent scoring the changes |
 | `SUPERVISOR_REVIEW` | Supervisor collecting scores |
 | `AUTO_MERGED` | PR merged; ADO item closed |
-| `PIPELINE_FAILED` | Score < 9 or critical failure; report filed |
+| `HUMAN_REVIEW_PENDING` | Score 7.0–7.99; draft PR opened, awaiting optional human promotion |
+| `PIPELINE_FAILED` | Score < 7.0 or blocking finding or hard agent error; report filed |
 
 ---
 
@@ -129,8 +130,8 @@
 **Responsibilities:**
 - Poll Azure DevOps via MCP for work items in `New` state
 - Invoke the Clarification Step on each new work item
-- If clarification score < 50: post clarifying questions to ADO, set item state to `Needs Info`, halt pipeline for that item
-- If clarification score >= 50: invoke the ADO Story Writer to break the requirement into User Stories and update the ADO board
+- If clarification score < 80: post clarifying questions to ADO, set item state to `Needs Info`, then block and poll — sleeping `POLL_INTERVAL_SECONDS` between checks. Each new human comment triggers a re-evaluation with the enriched description. The pipeline resumes automatically once the score reaches 80
+- If clarification score >= 80: invoke the ADO Story Writer to break the requirement into User Stories and update the ADO board
 - Sequentially trigger each downstream agent in order: Spec → Frontend → Backend → Test → Audit → Supervisor
 - Maintain a pipeline run record (JSON) tracking state, agent outputs, and timestamps
 - Handle agent failures: log, mark pipeline as failed, notify via ADO comment
@@ -174,8 +175,7 @@ Status updates are printed to the terminal in structured format and written to t
 | Score Range | Action |
 |---|---|
 | **>= 80** | Proceed automatically with the full pipeline |
-| **50 – 79** | Post clarifying questions as an ADO comment, but continue the pipeline with what is known. Flag spec as `partial_confidence = true` |
-| **< 50** | Halt pipeline completely. Post clarifying questions to ADO. Set work item state to `Needs Info` |
+| **< 80** | Post clarifying questions to ADO, set work item state to `Needs Info`, block and poll for a new human comment. Re-evaluate after each comment. Resume when score reaches 80 |
 
 **Scoring Guidance:** Start at 100. Deduct for each issue found: unidentifiable feature area (−30), no derivable acceptance criterion (−30), ambiguous pronouns or references (−15 each instance), unbounded scope (−20).
 
@@ -294,7 +294,7 @@ Scenarios are attached to the ADO user story in the Description field below the 
 ```
 
 **Inputs:** `StructuredSpec` from Clarification Agent, User Story IDs from Story Writer, current demo app codebase (read-only)
-**Outputs:** LLD JSON document, ADO comment with LLD summary
+**Outputs:** LLD JSON document, ADO comment with LLD summary, human-readable Markdown written to `outputs/_LLD.md` at the repository root
 
 **Must NOT:** Write any application code, make product or scope decisions, or modify ADO work item states (read and comment only).
 
@@ -399,9 +399,10 @@ Scenarios are attached to the ADO user story in the Description field below the 
 - Only modify files under `demo-app/frontend/src/__tests__/` and `demo-app/backend/tests/`
 - Tests must be deterministic — no time-dependent, order-dependent, or network-dependent tests without explicit mocking
 - Do not modify application source code to make tests pass
+- Mock components must render an empty placeholder — never render prop values as text children, as doing so causes spurious `getByText` matches in other tests
 
 **Inputs:** Change summaries from Frontend + Backend agents, current test suite
-**Outputs:** Committed test files, test run results JSON (pass/fail/coverage)
+**Outputs:** Committed test files, test run results JSON (pass/fail/coverage), `outputs/_TestResults.md` at the repository root with a full per-test breakdown (pass/fail/skipped per file)
 
 ---
 
@@ -496,7 +497,7 @@ ADO_ORG_URL=https://dev.azure.com/nainika-dev
 ADO_PROJECT=sdlc-agent
 ADO_PAT=<personal-access-token>          # stored in .env, never committed
 ADO_WORK_ITEM_POLL_INTERVAL_SECONDS=60
-ADO_TRIGGER_TAG=ai-pipeline              # work items must have this tag to be picked up
+ADO_TRIGGER_TAG=ai-pipeline-trigger      # work items must have this tag to be picked up
 ```
 
 ### Trigger Mechanism
@@ -504,7 +505,7 @@ ADO_TRIGGER_TAG=ai-pipeline              # work items must have this tag to be p
 The Orchestrator polls ADO every `ADO_WORK_ITEM_POLL_INTERVAL_SECONDS` for work items that:
 1. Are of type `Feature` or `User Story`
 2. Have state `New`
-3. Are tagged with `ai-pipeline`
+3. Are tagged with `ai-pipeline-trigger`
 
 This tag-based trigger ensures only explicitly opted-in work items enter the automated pipeline.
 
@@ -554,9 +555,15 @@ This tag-based trigger ensures only explicitly opted-in work items enter the aut
 sdlc-ai-pipeline/
 │
 ├── CLAUDE.md                          # ← You are here. Source of truth.
+├── CHANGELOG.md                       # Auto-updated on every successful pipeline merge
 ├── README.md                          # Brief public-facing overview
 ├── .env.example                       # Template for required env vars (no secrets)
 ├── .gitignore
+│
+├── outputs/                           # Pipeline-generated documents (gitignored)
+│   ├── _LLD.md                        # Low Level Design from Spec Agent (last run)
+│   ├── _TestResults.md                # Test results from Test Agent (last run)
+│   └── .gitkeep
 │
 ├── pipeline/                          # All agent and orchestration code
 │   ├── orchestrator/
@@ -912,5 +919,5 @@ The Supervisor Agent creates the PR via the GitHub API with:
 
 ---
 
-*Last updated: 2026-04-23*
+*Last updated: 2026-04-30*
 *This document must be updated whenever the pipeline architecture, agent responsibilities, tech stack, or standards change. No agent should act on information not reflected here.*
