@@ -159,9 +159,8 @@ TestResults/
 runs/*
 !runs/.gitkeep
 
-# LLD output documents — keep the placeholder, ignore generated files
-output/lld/*
-!output/lld/.gitkeep
+# LLD output — generated file, not committed
+_LLD.md
 
 # OS
 .DS_Store

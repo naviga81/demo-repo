@@ -43,7 +43,7 @@ _LOG_PREFIX = "[spec_agent]"
 _CODE_EXTENSIONS: frozenset[str] = frozenset({".tsx", ".ts", ".cs"})
 _SKIP_DIRS: frozenset[str] = frozenset({"node_modules", "bin", "obj", "dist", ".git"})
 _MAX_CONTENT_LINES: int = 50
-_LLD_PATH = _REPO_ROOT / "LLD.md"
+_LLD_PATH = _REPO_ROOT / "_LLD.md"
 
 
 def run(

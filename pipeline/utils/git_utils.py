@@ -62,7 +62,7 @@ def create_feature_branch(work_item_id: str, slug: str) -> str:
     except RuntimeError:
         pass
     try:
-        run_git(["clean", "-fd"], cwd=repo_root)
+        run_git(["clean", "-fd", "-e", "_LLD.md"], cwd=repo_root)
     except RuntimeError:
         pass
     run_git(["fetch", _ORIGIN, _MAIN_BRANCH], cwd=repo_root)
