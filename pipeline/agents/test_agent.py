@@ -149,6 +149,12 @@ Common issues to check first:
   Mock it with `vi.mock('../utils/constants', () => ({ FOO: vi.fn((id) => \`/api/v1/items/\${id}\`) }))`.
 - State type mismatch: if a hook exports `completing: boolean`, tests must not treat it as a Set.
 - Wrong expected error message: match the exact string from the source file.
+- String case: match the EXACT capitalisation of strings from source_files \
+  (e.g., if source_files shows `LABEL_X = 'Add a New Task'` then the test must use \
+  `'Add a New Task'` not `'Add a new task'`).
+- Wrong component under test: the test file name tells you what to test — \
+  Header.test.tsx must test the Header component, TaskForm.test.tsx must test TaskForm, etc. \
+  Never replace a test for one component with tests for a different component.
 - Use vi.fn() / vi.mock() / vi.stubGlobal() — never jest.*
 Respond ONLY with a valid JSON object — no preamble, no explanation, no markdown fences: \
 {"corrected_content": "<complete corrected TypeScript file content>"}\
@@ -264,6 +270,29 @@ _FRONTEND_UTILITY_FILES = [
     "demo-app/frontend/src/types/index.ts",
 ]
 
+_FRONTEND_SOURCE_SUBDIRS: tuple[str, ...] = ("components", "pages", "hooks", "context")
+
+
+def _infer_component_source(test_rel_path: str) -> str | None:
+    """Return the repo-relative source path for the component a test file exercises.
+
+    e.g. demo-app/frontend/src/__tests__/Header.test.tsx
+    →    demo-app/frontend/src/components/Header.tsx
+    Returns None when no matching source file is found.
+    """
+    stem = Path(test_rel_path).stem  # 'Header.test'
+    if not stem.endswith(".test"):
+        return None
+    component_name = stem[:-5]  # 'Header'
+    for subdir in _FRONTEND_SOURCE_SUBDIRS:
+        candidate = f"demo-app/frontend/src/{subdir}/{component_name}.tsx"
+        try:
+            git_utils.read_file(candidate)
+            return candidate
+        except (FileNotFoundError, RuntimeError):
+            pass
+    return None
+
 
 def _correct_frontend_tests(
     cases: list[TestCase],
@@ -301,11 +330,20 @@ def _correct_frontend_tests(
             except OSError:
                 continue
 
+            # Include the component the test exercises so Claude doesn't confuse components.
+            per_file_source = dict(source_files)
+            component_path = _infer_component_source(rel_path)
+            if component_path and component_path not in per_file_source:
+                try:
+                    per_file_source[component_path] = git_utils.read_file(component_path)
+                except (FileNotFoundError, RuntimeError):
+                    pass
+
             msg = json.dumps({
                 "test_file_path": rel_path,
                 "failing_tests": [{"name": c.name, "error": c.error_message or ""} for c in file_cases],
                 "test_file_content": current_content,
-                "source_files": source_files,
+                "source_files": per_file_source,
             }, indent=2)
 
             print(f"{_LOG_PREFIX} correcting {rel_path} ({len(file_cases)} failure(s))")
@@ -422,9 +460,10 @@ def _correct_backend_tests(
 def _extract_corrected_content(raw_text: str, context: str) -> str | None:
     """Extract the corrected file content from a Claude correction response.
 
-    Expects JSON {"corrected_content": "..."} but tolerates leading/trailing prose.
-    Returns None if no valid content can be extracted, so the caller can skip the
-    write rather than persisting prose or garbage into a source file.
+    Tries two strategies in order:
+    1. Parse as JSON {"corrected_content": "..."} with leading/trailing prose tolerance.
+    2. Extract code from a TypeScript/TSX/C# markdown code fence as a plain fallback.
+    Returns None if neither strategy yields valid content.
     """
     text = _strip_fences(raw_text)
     decoder = json.JSONDecoder()
@@ -439,6 +478,16 @@ def _extract_corrected_content(raw_text: str, context: str) -> str | None:
                     return content
         except json.JSONDecodeError:
             pass
+    # Fallback: extract code from a language-tagged markdown fence in the original response
+    fence_match = re.search(
+        r"```(?:typescript|tsx|ts|csharp|cs)?\s*\n([\s\S]+?)\n```",
+        raw_text,
+        re.IGNORECASE,
+    )
+    if fence_match:
+        code = fence_match.group(1).strip()
+        if code:
+            return code
     print(f"{_LOG_PREFIX} warning: could not parse corrected_content JSON for {context}")
     return None
 
