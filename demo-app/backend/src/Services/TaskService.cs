@@ -53,6 +53,7 @@ public sealed class TaskService : ITaskService
         Task.FromResult<IEnumerable<TaskModel>>(_tasks);
 
     /// <summary>Returns a single task by ID, or null if not found.</summary>
+    /// <param name="id">The task identifier.</param>
     public Task<TaskModel?> GetTaskByIdAsync(string id) =>
         Task.FromResult(_tasks.FirstOrDefault(t => t.Id == id));
 
@@ -74,6 +75,30 @@ public sealed class TaskService : ITaskService
         _tasks.Add(task);
 
         return Task.FromResult(task);
+    }
+
+    /// <summary>Marks an existing task as complete.</summary>
+    /// <param name="id">The task identifier.</param>
+    /// <returns>
+    /// A <see cref="CompleteTaskResult"/> discriminated union indicating the outcome.
+    /// </returns>
+    public Task<CompleteTaskResult> CompleteTaskAsync(string id)
+    {
+        var task = _tasks.FirstOrDefault(t => t.Id == id);
+
+        if (task is null)
+        {
+            return Task.FromResult<CompleteTaskResult>(new CompleteTaskResult.NotFound());
+        }
+
+        if (task.Completed)
+        {
+            return Task.FromResult<CompleteTaskResult>(new CompleteTaskResult.AlreadyCompleted());
+        }
+
+        task.Completed = true;
+
+        return Task.FromResult<CompleteTaskResult>(new CompleteTaskResult.Success(task));
     }
 
     private static DateOnly? ParseDueDate(string? value)

@@ -25,3 +25,10 @@ export const LABEL_DESCRIPTION_PLACEHOLDER = 'Enter task description (optional)'
 export const LABEL_WEATHER_LOADING = 'Loading weather...';
 export const LABEL_WEATHER_ERROR = 'Weather unavailable';
 export const LABEL_WEATHER_ARIA = 'Current weather';
+
+export const LABEL_MARK_COMPLETE = 'Mark Complete';
+export const LABEL_MARK_COMPLETE_ARIA = 'Mark task as complete';
+export const LABEL_COMPLETE_ERROR = 'Failed to mark task as complete. Please try again.';
+
+export const LABEL_FETCH_TASKS_ERROR_PREFIX = 'Failed to fetch tasks: ';
+export const LABEL_UNKNOWN_ERROR = 'Unknown error';

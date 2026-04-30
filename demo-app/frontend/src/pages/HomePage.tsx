@@ -3,6 +3,7 @@ import { TaskForm } from '../components/TaskForm';
 import { useTasks } from '../hooks/useTasks';
 import type { Task } from '../types';
 import {
+  LABEL_COMPLETE_ERROR,
   LABEL_ERROR_PREFIX,
   LABEL_LOADING,
   LABEL_NO_TASKS,
@@ -12,7 +13,7 @@ import {
 } from '../utils/strings';
 
 export function HomePage() {
-  const { tasks, loading, error, refetch, addTask } = useTasks();
+  const { tasks, loading, error, completeError, refetch, addTask, completeTask } = useTasks();
 
   const handleTaskCreated = (task: Task) => {
     addTask(task);
@@ -50,13 +51,18 @@ export function HomePage() {
       <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
         {LABEL_TASKS_HEADING}
       </h2>
+      {completeError && (
+        <p className="mb-4 text-sm text-red-600 dark:text-red-400">
+          {LABEL_COMPLETE_ERROR}
+        </p>
+      )}
       {tasks.length === 0 ? (
         <p className="text-gray-500 dark:text-gray-400">{LABEL_NO_TASKS}</p>
       ) : (
         <ul className="flex flex-col gap-3">
           {tasks.map((task) => (
             <li key={task.id}>
-              <TaskCard task={task} />
+              <TaskCard task={task} onComplete={completeTask} />
             </li>
           ))}
         </ul>

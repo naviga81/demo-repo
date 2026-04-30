@@ -120,4 +120,40 @@ public sealed class TaskServiceTests
         Assert.NotEqual(task1.Id, task2.Id);
         Assert.Equal(int.Parse(task1.Id) + 1, int.Parse(task2.Id));
     }
+
+    [Fact]
+    public async Task CompleteTaskAsync_PendingTask_ReturnsSuccessWithCompletedTask()
+    {
+        var result = await _sut.CompleteTaskAsync("2");
+
+        var success = Assert.IsType<CompleteTaskResult.Success>(result);
+        Assert.True(success.Task.Completed);
+        Assert.Equal("2", success.Task.Id);
+    }
+
+    [Fact]
+    public async Task CompleteTaskAsync_PendingTask_PersistsCompletedState()
+    {
+        await _sut.CompleteTaskAsync("2");
+
+        var task = await _sut.GetTaskByIdAsync("2");
+        Assert.NotNull(task);
+        Assert.True(task.Completed);
+    }
+
+    [Fact]
+    public async Task CompleteTaskAsync_AlreadyCompletedTask_ReturnsAlreadyCompleted()
+    {
+        var result = await _sut.CompleteTaskAsync("1");
+
+        Assert.IsType<CompleteTaskResult.AlreadyCompleted>(result);
+    }
+
+    [Fact]
+    public async Task CompleteTaskAsync_NonExistentId_ReturnsNotFound()
+    {
+        var result = await _sut.CompleteTaskAsync("nonexistent");
+
+        Assert.IsType<CompleteTaskResult.NotFound>(result);
+    }
 }

@@ -39,14 +39,13 @@ public sealed class TasksControllerTests
 
         _sut.ProblemDetailsFactory = problemDetailsFactory.Object;
 
-        // Set up a default HttpContext so ProblemDetailsFactory calls don't fail on null context
         _sut.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         };
     }
 
-    // ── GET /api/v1/tasks ────────────────────────────────────────────────────
+    // ── GET /api/v1/tasks ────────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetAllTasks_TasksExist_Returns200WithTaskList()
@@ -63,7 +62,7 @@ public sealed class TasksControllerTests
         Assert.Equal(200, okResult.StatusCode);
     }
 
-    // ── GET /api/v1/tasks/{id} ───────────────────────────────────────────────
+    // ── GET /api/v1/tasks/{id} ───────────────────────────────────────────────────
 
     [Fact]
     public async Task GetTaskById_ValidId_Returns200WithTask()
@@ -90,7 +89,7 @@ public sealed class TasksControllerTests
         Assert.IsType<NotFoundResult>(result);
     }
 
-    // ── POST /api/v1/tasks ───────────────────────────────────────────────────
+    // ── POST /api/v1/tasks ───────────────────────────────────────────────────────
 
     [Fact]
     public async Task CreateTask_ValidDto_Returns201WithCreatedTask()
@@ -184,5 +183,56 @@ public sealed class TasksControllerTests
         var createdResult = Assert.IsType<CreatedAtActionResult>(result);
         Assert.Equal(nameof(_sut.GetTaskById), createdResult.ActionName);
         Assert.Equal("6", createdResult.RouteValues!["id"]);
+    }
+
+    // ── PATCH /api/v1/tasks/{id}/complete ────────────────────────────────────────
+
+    [Fact]
+    public async Task CompleteTask_PendingTask_Returns200WithCompletedDto()
+    {
+        var task = new TaskModel
+        {
+            Id = "2",
+            Title = "Write unit tests",
+            Description = "Cover all service methods.",
+            Completed = true,
+            CreatedAt = DateTime.UtcNow,
+        };
+        _mockService
+            .Setup(s => s.CompleteTaskAsync("2"))
+            .ReturnsAsync(new CompleteTaskResult.Success(task));
+
+        var result = await _sut.CompleteTask("2");
+
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(200, okResult.StatusCode);
+        var dto = Assert.IsType<TaskDto>(okResult.Value);
+        Assert.Equal("2", dto.Id);
+        Assert.True(dto.Completed);
+    }
+
+    [Fact]
+    public async Task CompleteTask_NonExistentId_Returns404()
+    {
+        _mockService
+            .Setup(s => s.CompleteTaskAsync("nonexistent"))
+            .ReturnsAsync(new CompleteTaskResult.NotFound());
+
+        var result = await _sut.CompleteTask("nonexistent");
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task CompleteTask_AlreadyCompleted_Returns409Conflict()
+    {
+        _mockService
+            .Setup(s => s.CompleteTaskAsync("1"))
+            .ReturnsAsync(new CompleteTaskResult.AlreadyCompleted());
+
+        var result = await _sut.CompleteTask("1");
+
+        var conflictResult = Assert.IsType<ConflictObjectResult>(result);
+        Assert.Equal(409, conflictResult.StatusCode);
     }
 }

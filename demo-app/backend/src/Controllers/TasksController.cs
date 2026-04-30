@@ -75,6 +75,29 @@ public sealed class TasksController : ControllerBase
         return CreatedAtAction(nameof(GetTaskById), new { id = result.Id }, result);
     }
 
+    /// <summary>Marks a task as complete.</summary>
+    /// <param name="id">The task identifier.</param>
+    /// <returns>The updated task with completed set to true, or 404 if not found, or 409 if already completed.</returns>
+    /// <response code="200">Task marked as complete successfully.</response>
+    /// <response code="404">No task found with the given ID.</response>
+    /// <response code="409">Task is already marked as complete.</response>
+    [HttpPatch("{id}/complete")]
+    [ProducesResponseType(typeof(TaskDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CompleteTask(string id)
+    {
+        var result = await _taskService.CompleteTaskAsync(id);
+
+        return result switch
+        {
+            CompleteTaskResult.NotFound => NotFound(),
+            CompleteTaskResult.AlreadyCompleted => Conflict(new { message = "Task is already marked as complete." }),
+            CompleteTaskResult.Success task => Ok(MapToDto(task.Task)),
+            _ => StatusCode(StatusCodes.Status500InternalServerError),
+        };
+    }
+
     private static TaskDto MapToDto(TaskModel task) =>
         new()
         {
