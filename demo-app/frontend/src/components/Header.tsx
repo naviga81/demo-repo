@@ -17,6 +17,7 @@ export function Header() {
     <header className="bg-white dark:bg-gray-800 shadow-sm px-6 py-4 flex items-center justify-between">
       <h1 className="text-xl font-semibold text-gray-900 dark:text-white">{APP_TITLE}</h1>
       <div className="flex items-center gap-2">
+        <span aria-hidden="true" className="text-2xl leading-none">&#128512;</span>
         <WeatherWidget />
         <ThemeIcon isDark={isDark} />
         <button
