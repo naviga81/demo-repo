@@ -374,22 +374,30 @@ class ADOClient:
         return [ref["id"] for ref in response.json().get("workItems", [])]
 
     def _fetch_work_items_by_ids(self, ids: list[int]) -> list[dict[str, Any]]:
-        """Bulk-fetch full work item data for a list of IDs.
+        """Bulk-fetch full work item data for a list of IDs in batches of 200.
+
+        ADO's bulk endpoint rejects requests with more than 200 IDs (HTTP 500
+        VS403474). Batching ensures this limit is never exceeded regardless of
+        how many IDs the preceding WIQL query returns.
 
         Uses the org-scoped endpoint because work item IDs are org-unique.
 
         Raises:
-            ADOClientError: If the bulk fetch request fails.
+            ADOClientError: If any batch request fails.
         """
-        ids_param = ",".join(str(i) for i in ids)
+        results: list[dict[str, Any]] = []
         url = self._at_org(_ENDPOINT_WORK_ITEMS)
-        response = requests.get(
-            url,
-            headers=self._auth_headers,
-            params=self._params({"ids": ids_param, "$expand": "all"}),
-            timeout=_REQUEST_TIMEOUT,
-        )
-        self._raise_for_error(
-            response, f"Bulk fetch failed for work item ids: {ids_param}"
-        )
-        return response.json().get("value", [])
+        for batch_start in range(0, len(ids), 200):
+            batch = ids[batch_start : batch_start + 200]
+            ids_param = ",".join(str(i) for i in batch)
+            response = requests.get(
+                url,
+                headers=self._auth_headers,
+                params=self._params({"ids": ids_param, "$expand": "all"}),
+                timeout=_REQUEST_TIMEOUT,
+            )
+            self._raise_for_error(
+                response, f"Bulk fetch failed for work item ids: {ids_param}"
+            )
+            results.extend(response.json().get("value", []))
+        return results

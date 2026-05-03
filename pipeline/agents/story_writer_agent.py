@@ -56,11 +56,15 @@ def run(
     stories = _generate_stories(structured_spec, anthropic_client)
 
     try:
-        existing_items = ado_client.get_work_items(tag="ai-pipeline")
+        existing_items = ado_client.get_work_items(
+            item_type="User Story", tag="ai-pipeline"
+        )
     except ADOClientError as exc:
-        raise RuntimeError(
-            f"Story Writer: could not fetch existing items for duplicate check: {exc}"
-        ) from exc
+        print(
+            f"{_LOG_PREFIX} warning: could not fetch existing items for duplicate "
+            f"check — proceeding without deduplication: {exc}"
+        )
+        existing_items = []
 
     created_ids: list[int] = []
     for story in stories:
