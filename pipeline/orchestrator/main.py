@@ -8,6 +8,7 @@ human escalation when all retries are exhausted.
 
 import json
 import os
+import re
 import sys
 import time
 from collections.abc import Callable
@@ -68,13 +69,26 @@ _PIPELINE_HALTED_COMMENT = (
 )
 
 _REPO_ROOT = _PIPELINE_DIR.parent
-_TEST_RESULTS_PATH = _REPO_ROOT / "outputs" / "_TestResults.md"
 
 
-def _write_test_results_doc(result: Any, work_item_id: str) -> str:
-    """Write _TestResults.md at the repo root with full per-test detail.
+def _make_report_slug(title: str) -> str:
+    """First 3 words of title in kebab-case, max 30 chars."""
+    slug = re.sub(r"[^a-z0-9\s-]", "", title.lower())
+    return "-".join(slug.split()[:3])[:30].rstrip("-")
 
-    Returns the filename so callers can reference it in comments.
+
+def _make_test_report_path(work_item_id: str, title: str) -> Path:
+    return _REPO_ROOT / "outputs" / "test-reports" / f"TestReport_WI-{work_item_id}_{_make_report_slug(title)}.md"
+
+
+def _make_audit_report_path(work_item_id: str, title: str) -> Path:
+    return _REPO_ROOT / "outputs" / "audit-reports" / f"AuditReport_WI-{work_item_id}_{_make_report_slug(title)}.md"
+
+
+def _write_test_results_doc(result: Any, work_item_id: str, title: str) -> str:
+    """Write the test report to outputs/test-reports/ under a per-work-item filename.
+
+    Returns the repo-relative path so callers can reference it in comments.
     """
     from contracts.test_results import TestStatus  # local import avoids circular deps
 
@@ -125,9 +139,69 @@ def _write_test_results_doc(result: Any, work_item_id: str) -> str:
     lines.extend(_case_lines(TestStatus.skipped))
     lines.append("")
 
-    _TEST_RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _TEST_RESULTS_PATH.write_text("\n".join(lines), encoding="utf-8")
-    return str(_TEST_RESULTS_PATH.relative_to(_REPO_ROOT))
+    path = _make_test_report_path(work_item_id, title)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return str(path.relative_to(_REPO_ROOT))
+
+
+def _write_audit_report_doc(report: Any, work_item_id: str, title: str) -> str:
+    """Write the audit report to outputs/audit-reports/ under a per-work-item filename.
+
+    Returns the repo-relative path so callers can reference it in comments.
+    """
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    cats = report.categories
+
+    def _cat_lines(label: str, cat: Any) -> list[str]:
+        rows = [f"### {label} — `{cat.score} / {cat.max_score}`", ""]
+        if cat.findings:
+            for f in cat.findings:
+                loc = f" ({f.file_path}:{f.line_number})" if f.file_path else ""
+                rows.append(f"- **{f.severity.value.upper()}**{loc}: {f.description}")
+        else:
+            rows.append("_(no findings)_")
+        rows.append("")
+        return rows
+
+    lines: list[str] = [
+        f"# Audit Report — Work Item {work_item_id}",
+        "",
+        f"_Generated: {ts}_",
+        "",
+        "---",
+        "",
+        "## Result",
+        "",
+        "| Composite Score | Recommendation |",
+        "|---|---|",
+        f"| **{report.composite_score} / 10.0** | **{report.merge_recommendation.value.upper()}** |",
+        "",
+        "---",
+        "",
+        "## Category Scores",
+        "",
+    ]
+    lines += _cat_lines("Code Correctness", cats.code_correctness)
+    lines += _cat_lines("Standards Compliance", cats.standards_compliance)
+    lines += _cat_lines("Test Coverage & Quality", cats.test_coverage)
+    lines += _cat_lines("Security", cats.security)
+    lines += _cat_lines("Spec Adherence", cats.spec_adherence)
+    lines += _cat_lines("Performance", cats.performance)
+    lines += _cat_lines("Documentation", cats.documentation)
+    lines += ["---", "", "## Blocking Findings", ""]
+    if report.blocking_findings:
+        for f in report.blocking_findings:
+            loc = f" ({f.file_path}:{f.line_number})" if f.file_path else ""
+            lines.append(f"- **{f.severity.value.upper()}**{loc}: {f.description}")
+    else:
+        lines.append("_(none)_")
+    lines += ["", "---", "", "## Summary", "", report.summary, ""]
+
+    path = _make_audit_report_path(work_item_id, title)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return str(path.relative_to(_REPO_ROOT))
 
 
 class Orchestrator:
@@ -803,7 +877,7 @@ class Orchestrator:
         coverage = result.coverage.line_coverage_percent if result.coverage else 0.0
         status_label = "PASS" if result.failed == 0 else "FAIL"
 
-        doc_name = _write_test_results_doc(result, work_item_id)
+        doc_name = _write_test_results_doc(result, work_item_id, run.clarification_output.spec.title)
 
         comment = (
             f"[AI Pipeline] <strong>Tests Complete &mdash; {status_label}</strong><br><br>"
@@ -850,6 +924,7 @@ class Orchestrator:
             self.anthropic_client,
         )
         run.audit_report = report
+        _write_audit_report_doc(report, work_item_id, run.clarification_output.spec.title)
 
         cats = report.categories
         all_findings = (

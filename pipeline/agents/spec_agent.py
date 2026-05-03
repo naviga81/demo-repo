@@ -8,6 +8,7 @@ Exceptions propagate so the Orchestrator's retry loop can catch them.
 """
 
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,7 +44,13 @@ _LOG_PREFIX = "[spec_agent]"
 _CODE_EXTENSIONS: frozenset[str] = frozenset({".tsx", ".ts", ".cs"})
 _SKIP_DIRS: frozenset[str] = frozenset({"node_modules", "bin", "obj", "dist", ".git"})
 _MAX_CONTENT_LINES: int = 50
-_LLD_PATH = _REPO_ROOT / "outputs" / "_LLD.md"
+
+
+def _make_lld_path(work_item_id: str, title: str) -> Path:
+    """Generate a per-work-item LLD path: outputs/lld/LLD_WI-{id}_{slug}.md"""
+    slug = re.sub(r"[^a-z0-9\s-]", "", title.lower())
+    slug = "-".join(slug.split()[:3])[:30].rstrip("-")
+    return _REPO_ROOT / "outputs" / "lld" / f"LLD_WI-{work_item_id}_{slug}.md"
 
 
 def run(
@@ -73,7 +80,7 @@ def run(
     raw = _call_claude(system_prompt, user_message, anthropic_client)
 
     lld = _build_lld_document(raw, work_item_id)
-    lld_path = _write_lld_document(lld, work_item_id)
+    lld_path = _write_lld_document(lld, work_item_id, structured_spec.title)
     _post_lld_comment(lld_path, work_item_id, ado_client)
 
     print(
@@ -343,11 +350,12 @@ def _render_lld_markdown(lld: LLDDocument, work_item_id: str) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _write_lld_document(lld: LLDDocument, work_item_id: str) -> str:
-    """Write _LLD.md to the outputs folder. Returns the repo-relative path."""
-    _LLD_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _LLD_PATH.write_text(_render_lld_markdown(lld, work_item_id), encoding="utf-8")
-    return str(_LLD_PATH.relative_to(_REPO_ROOT))
+def _write_lld_document(lld: LLDDocument, work_item_id: str, title: str) -> str:
+    """Write the LLD to outputs/lld/ under a per-work-item filename. Returns repo-relative path."""
+    lld_path = _make_lld_path(work_item_id, title)
+    lld_path.parent.mkdir(parents=True, exist_ok=True)
+    lld_path.write_text(_render_lld_markdown(lld, work_item_id), encoding="utf-8")
+    return str(lld_path.relative_to(_REPO_ROOT))
 
 
 def _post_lld_comment(lld_path: str, work_item_id: str, ado_client: ADOClient) -> None:
