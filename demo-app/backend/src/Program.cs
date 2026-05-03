@@ -14,11 +14,15 @@ builder.Services.AddSwaggerGen(options =>
     }
 });
 
+var allowedOrigin = builder.Configuration["Cors:AllowedOrigin"]
+    ?? throw new InvalidOperationException(
+        "CORS allowed origin is not configured. Add 'Cors:AllowedOrigin' to appsettings.json.");
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins("http://localhost:5173")
+        policy.WithOrigins(allowedOrigin)
               .AllowAnyHeader()
               .AllowAnyMethod();
     });
@@ -27,6 +31,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddSingleton<ITaskService, TaskService>();
 builder.Services.AddSingleton<IUserService, UserService>();
 builder.Services.AddSingleton<IWeatherService, WeatherService>();
+builder.Services.AddSingleton<ICommentService, CommentService>();
 
 var app = builder.Build();
 

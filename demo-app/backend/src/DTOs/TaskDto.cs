@@ -6,6 +6,9 @@ namespace DemoApp.Api.DTOs;
 /// </summary>
 public class TaskDto
 {
+    /// <summary>The default priority level applied to new tasks.</summary>
+    public const string DefaultPriority = "medium";
+
     /// <summary>Gets or sets the unique identifier.</summary>
     public string Id { get; set; } = string.Empty;
 
@@ -24,9 +27,15 @@ public class TaskDto
     /// <summary>Gets or sets the UTC creation timestamp.</summary>
     public DateTime CreatedAt { get; set; }
 
+    /// <summary>Gets or sets the optional UTC completion timestamp.</summary>
+    public DateTime? CompletedAt { get; set; }
+
     /// <summary>Gets or sets the optional name of the user assigned to this task.</summary>
     public string? AssignedTo { get; set; }
 
     /// <summary>Gets or sets the priority level of the task as a lowercase string (low, medium, high).</summary>
-    public string Priority { get; set; } = "medium";
+    public string Priority { get; set; } = DefaultPriority;
+
+    /// <summary>Gets or sets the number of comments on this task.</summary>
+    public int CommentCount { get; set; }
 }
