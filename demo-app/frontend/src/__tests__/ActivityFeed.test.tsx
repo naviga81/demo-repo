@@ -11,40 +11,32 @@ const makeEntry = (id: string, description: string, createdAt: string): Activity
 });
 
 describe('ActivityFeed', () => {
-  it('render test - renders a list of activity entries with descriptions and timestamps', () => {
+  it('render test - renders a list of activity entries with descriptions', () => {
     const entries: ActivityEntry[] = [
-      makeEntry('1', 'Task created', '2024-01-10T09:00:00.000Z'),
-      makeEntry('2', 'Comment added', '2024-01-11T10:00:00.000Z'),
+      makeEntry('a1', 'Task created', '2024-01-10T09:00:00.000Z'),
+      makeEntry('a2', 'Comment added', '2024-01-11T10:00:00.000Z'),
     ];
 
-    render(
-      <ActivityFeed entries={entries} fetchLoading={false} fetchError={null} />
-    );
+    render(<ActivityFeed entries={entries} fetchLoading={false} fetchError={null} />);
 
     expect(screen.getByText('Task created')).toBeInTheDocument();
     expect(screen.getByText('Comment added')).toBeInTheDocument();
   });
 
   it('interaction test - renders the loading message when fetchLoading is true', () => {
-    render(
-      <ActivityFeed entries={[]} fetchLoading={true} fetchError={null} />
-    );
+    render(<ActivityFeed entries={[]} fetchLoading={true} fetchError={null} />);
 
     expect(screen.getByText('Loading activity...')).toBeInTheDocument();
   });
 
-  it('edge case - renders empty state message when entries is empty and not loading', () => {
-    render(
-      <ActivityFeed entries={[]} fetchLoading={false} fetchError={null} />
-    );
+  it('edge case - renders the empty message when entries array is empty and not loading', () => {
+    render(<ActivityFeed entries={[]} fetchLoading={false} fetchError={null} />);
 
     expect(screen.getByText('No activity recorded yet.')).toBeInTheDocument();
   });
 
-  it('edge case - renders fetch error message when fetchError is set', () => {
-    render(
-      <ActivityFeed entries={[]} fetchLoading={false} fetchError="Some error" />
-    );
+  it('edge case - renders the error message when fetchError is provided', () => {
+    render(<ActivityFeed entries={[]} fetchLoading={false} fetchError="some error" />);
 
     expect(screen.getByText('Failed to load activity. Please try again.')).toBeInTheDocument();
   });

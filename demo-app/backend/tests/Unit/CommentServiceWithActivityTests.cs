@@ -44,4 +44,12 @@ public sealed class CommentServiceWithActivityTests
             s => s.RecordActivityAsync(It.IsAny<string>(), It.Is<string>(d => d != "Comment added")),
             Times.Never);
     }
+
+    [Fact]
+    public async Task AddCommentAsync_ValidInput_ReturnsCommentWithCorrectTaskId()
+    {
+        var result = await _sut.AddCommentAsync("task-1", "Hello");
+
+        Assert.Equal("task-1", result.TaskId);
+    }
 }

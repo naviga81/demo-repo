@@ -69,4 +69,15 @@ public sealed class TaskServiceWithActivityTests
             s => s.RecordActivityAsync(It.IsAny<string>(), It.IsAny<string>()),
             Times.Never);
     }
+
+    [Fact]
+    public async Task CompleteTaskAsync_AlreadyCompletedTask_DoesNotRecordActivity()
+    {
+        // Task "1" is seeded as already completed
+        await _sut.CompleteTaskAsync("1");
+
+        _mockActivityService.Verify(
+            s => s.RecordActivityAsync(It.IsAny<string>(), It.IsAny<string>()),
+            Times.Never);
+    }
 }
