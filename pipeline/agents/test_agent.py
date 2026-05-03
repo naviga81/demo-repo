@@ -49,6 +49,7 @@ _TEST_RUNNER_TIMEOUT = 300
 _VALID_TEST_ROOTS: tuple[str, ...] = (_FRONTEND_TEST_DIR, _BACKEND_TEST_ROOT)
 _TEST_FILE_EXTENSIONS: frozenset[str] = frozenset({".ts", ".tsx", ".cs"})
 _PROMPT_PATH = _PIPELINE_DIR / "prompts" / "test.md"
+_MAX_FILE_CORRECTIONS = 3  # delete a test file after this many correction attempts
 
 _TS_CODE_MARKERS: tuple[str, ...] = (
     "import ", "describe(", "it(", "test(", "export ", "const ", "function ", "vi.",
@@ -171,7 +172,18 @@ Common issues to check first:
   `export const FOO = (id: string) => ...` then FOO is a function, not a string. \
   Mock it with vi.mock('../utils/constants', () => ({ FOO: vi.fn((id) => `/api/v1/items/${id}`) })).
 - State type mismatch: if a hook exports `completing: boolean`, tests must not treat it as a Set.
-- Wrong expected error message: match the exact string from the source file.
+- Wrong expected error message: for HOOK test files (useX.test.ts), you MUST trace \
+  the exact error string the hook assigns to state — look at the catch block in source_files. \
+  If the hook does `setFetchError(err instanceof Error ? err.message : 'Unknown error')` and \
+  you mock fetch to return `{ ok: false, status: 500 }`, the hook throws \
+  `new Error('Request failed with status 500')` so fetchError will be \
+  `'Request failed with status 500'` — NOT any string from utils/strings.ts. \
+  Only use a string from utils/strings.ts if the hook itself imports and returns that constant.
+- Never add hook state assertions inside a COMPONENT test file (*.test.tsx): \
+  do not use `result.current.X` or `renderHook` in a component test. \
+  Component tests (CommentPanel.test.tsx etc.) must only use DOM queries \
+  (getByText, getByRole, getByTestId, getByLabelText). \
+  If a hook-level assertion appears in a component test, remove it entirely.
 - String case: match the EXACT capitalisation of strings from source_files \
   (e.g., if source_files shows `LABEL_X = 'Add a New Task'` then the test must use \
   `'Add a New Task'` not `'Add a new task'`).
@@ -406,9 +418,12 @@ def _correct_frontend_tests(
         if path not in source_files:
             source_files[path] = content
 
-    # Track per-file how many consecutive corrections produced no content change.
-    # When a file is stuck, delete it so the next orchestrator retry regenerates it fresh.
+    # Track per-file how many times we have attempted a correction and how many times
+    # consecutive corrections produced no content change.
+    # A file that has been corrected _MAX_FILE_CORRECTIONS times and still fails is deleted
+    # so the remaining budget is available for other failing files.
     stuck_counts: dict[str, int] = {}
+    correction_counts: dict[str, int] = {}
 
     for attempt in range(1, _CORRECTION_MAX_ATTEMPTS + 1):
         failed = [c for c in best if c.status == TestStatus.failed]
@@ -429,6 +444,18 @@ def _correct_frontend_tests(
         any_fixed = False
         for rel_path, file_cases in file_failures.items():
             abs_path = repo_root / rel_path
+
+            # Delete files that have already been corrected too many times — they are
+            # unrecoverable for this run and burning the budget prevents other files from
+            # being fixed.
+            if correction_counts.get(rel_path, 0) >= _MAX_FILE_CORRECTIONS:
+                print(f"{_LOG_PREFIX} deleting exhausted test (>{_MAX_FILE_CORRECTIONS} corrections): {Path(rel_path).name}")
+                if abs_path.exists():
+                    abs_path.unlink()
+                    git_utils.commit_changes([rel_path], f"[auto-fix] delete exhausted test: {rel_path}")
+                    any_fixed = True
+                continue
+
             try:
                 current_content = abs_path.read_text(encoding="utf-8")
             except OSError:
@@ -487,6 +514,7 @@ def _correct_frontend_tests(
                 continue
 
             stuck_counts[rel_path] = 0
+            correction_counts[rel_path] = correction_counts.get(rel_path, 0) + 1
             git_utils.write_file(rel_path, corrected)
             git_utils.commit_changes([rel_path], f"[auto-fix] correct test: {rel_path}")
             any_fixed = True
