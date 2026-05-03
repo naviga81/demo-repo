@@ -52,4 +52,17 @@ public sealed class CommentServiceWithActivityTests
 
         Assert.Equal("task-1", result.TaskId);
     }
+
+    [Fact]
+    public async Task GetCommentsByTaskIdAsync_DoesNotRecordActivity()
+    {
+        await _sut.AddCommentAsync("task-1", "A comment");
+        _mockActivityService.Invocations.Clear();
+
+        await _sut.GetCommentsByTaskIdAsync("task-1");
+
+        _mockActivityService.Verify(
+            s => s.RecordActivityAsync(It.IsAny<string>(), It.IsAny<string>()),
+            Times.Never);
+    }
 }

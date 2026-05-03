@@ -80,4 +80,16 @@ public sealed class TaskServiceWithActivityTests
             s => s.RecordActivityAsync(It.IsAny<string>(), It.IsAny<string>()),
             Times.Never);
     }
+
+    [Fact]
+    public async Task UpdateTaskPriorityAsync_ValidPriority_DoesNotRecordActivity()
+    {
+        var dto = new UpdateTaskPriorityDto { Priority = "high" };
+
+        await _sut.UpdateTaskPriorityAsync("2", dto);
+
+        _mockActivityService.Verify(
+            s => s.RecordActivityAsync(It.IsAny<string>(), It.IsAny<string>()),
+            Times.Never);
+    }
 }
