@@ -6,9 +6,9 @@ _Generated: 2026-05-03 05:55 UTC_
 
 ## Result
 
-| Composite Score | Recommendation |
-|---|---|
-| **7.85 / 10.0** | **HUMAN_REVIEW** |
+| Composite Score   | Recommendation   |
+|-------------------|------------------|
+| **7.85 / 10.0**   | **HUMAN_REVIEW** |
 
 ---
 
@@ -19,6 +19,10 @@ _Generated: 2026-05-03 05:55 UTC_
 - **MEDIUM** (demo-app/frontend/src/hooks/useCompletedTasks.ts:15): useCompletedTasks calls useTasks() independently, creating a second fetch/state instance separate from the one used by useUpcomingTasks in HomePage. This means completed tasks are fetched and managed in a completely separate state tree, so optimistic updates applied via completeTask in useUpcomingTasks will not be reflected in the completed list until the separate fetch in useCompletedTasks resolves. The LLD intended useCompletedTasks to derive from the same task list, but the implementation of useTasks as called twice does not share state unless useTasks itself is a singleton/shared store.
 - **LOW** (demo-app/frontend/src/hooks/useCompletedTasks.ts:8): getCompletedSortKey falls back to createdAt when completedAt is absent. While this is a reasonable fallback, for tasks that are marked complete the completedAt field should always be present per normal API contract. Silently falling back to createdAt could produce incorrect sort order if completedAt is unexpectedly missing, and no warning or defensive logging is emitted.
 - **MEDIUM** (demo-app/frontend/src/components/CompletedTasksSection.tsx:16): CompletedTasksSection passes onComplete to TaskCard for completed tasks, which would allow a user to 're-complete' an already-completed task. There is no guard in CompletedTasksSection or TaskCard to suppress or disable the Mark Complete button for tasks that already have completed=true.
+
+---
+
+## Category Scores (continued)
 
 ### Standards Compliance — `1.2 / 1.5`
 
