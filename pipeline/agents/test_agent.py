@@ -100,6 +100,23 @@ def run(
             deleted_test_files.append(rel)
             print(f"{_LOG_PREFIX} deleted stale frontend test: {test_file.name}")
 
+    # Mirror the same logic for backend: delete stale unit test files whose source was touched.
+    # This prevents build errors when a constructor signature changes (e.g. a new injected dep).
+    backend_changed_stems = {
+        Path(p).stem
+        for p in backend_summary.files_created + backend_summary.files_modified
+    }
+    backend_unit_dir = repo_root / _BACKEND_TEST_ROOT / "Unit"
+    if backend_unit_dir.exists() and backend_changed_stems:
+        for test_file in sorted(backend_unit_dir.rglob("*.cs")):
+            if not test_file.is_file():
+                continue
+            if any(source_stem in test_file.stem for source_stem in backend_changed_stems):
+                rel = str(test_file.relative_to(repo_root))
+                test_file.unlink()
+                deleted_test_files.append(rel)
+                print(f"{_LOG_PREFIX} deleted stale backend test: {test_file.name}")
+
     print(f"{_LOG_PREFIX} reading existing test files")
     existing_tests = _read_existing_tests()
 
@@ -261,7 +278,12 @@ def _map_backend_failures_to_files(
     test_root: Path,
     repo_root: Path,
 ) -> dict[str, list[TestCase]]:
-    """Map failing backend cases to .cs files by xUnit class name, with method-name fallback."""
+    """Map failing backend cases to .cs files.
+
+    Handles two case types:
+    - Build errors: parses absolute .cs paths from the compiler output in error_message.
+    - Assertion failures: maps by xUnit class name with method-name fallback.
+    """
     cs_files: dict[str, str] = {}
     for f in sorted(test_root.rglob("*.cs")):
         if f.is_file():
@@ -272,7 +294,26 @@ def _map_backend_failures_to_files(
                 pass
 
     file_to_cases: dict[str, list[TestCase]] = {}
+
+    # First pass: build errors contain the absolute path of the broken file in stderr.
+    _BUILD_ERROR_NAMES = {"dotnet_build_or_runtime_error", "backend_suite_runner_error"}
     for case in failed:
+        if case.name not in _BUILD_ERROR_NAMES:
+            continue
+        error_text = case.error_message or ""
+        for path_match in re.finditer(r"(/[^\s(]+\.cs)\(\d+,\d+\):", error_text):
+            abs_path_str = path_match.group(1)
+            try:
+                rel = str(Path(abs_path_str).relative_to(repo_root))
+                if rel.startswith(_BACKEND_TEST_ROOT):
+                    file_to_cases.setdefault(rel, []).append(case)
+            except ValueError:
+                pass
+
+    # Second pass: normal assertion failures mapped by class name / method name.
+    for case in failed:
+        if case.name in _BUILD_ERROR_NAMES:
+            continue
         name_parts = case.name.rsplit(".", 2)
         class_candidate = name_parts[-2] if len(name_parts) >= 2 else ""
         matched = False
@@ -346,6 +387,10 @@ def _correct_frontend_tests(
         if path not in source_files:
             source_files[path] = content
 
+    # Track per-file how many consecutive corrections produced no content change.
+    # When a file is stuck, delete it so the next orchestrator retry regenerates it fresh.
+    stuck_counts: dict[str, int] = {}
+
     for attempt in range(1, _CORRECTION_MAX_ATTEMPTS + 1):
         failed = [c for c in best if c.status == TestStatus.failed]
         if not failed:
@@ -412,6 +457,17 @@ def _correct_frontend_tests(
             if corrected is None:
                 print(f"{_LOG_PREFIX} warning: correction for {rel_path} returned no parseable code — skipping")
                 continue
+
+            if corrected.strip() == current_content.strip():
+                stuck_counts[rel_path] = stuck_counts.get(rel_path, 0) + 1
+                if stuck_counts[rel_path] >= 2:
+                    print(f"{_LOG_PREFIX} deleting stuck test (correction produces no change): {Path(rel_path).name}")
+                    abs_path.unlink()
+                    git_utils.commit_changes([rel_path], f"[auto-fix] delete stuck test: {rel_path}")
+                    any_fixed = True
+                continue
+
+            stuck_counts[rel_path] = 0
             git_utils.write_file(rel_path, corrected)
             git_utils.commit_changes([rel_path], f"[auto-fix] correct test: {rel_path}")
             any_fixed = True
@@ -441,6 +497,8 @@ def _correct_backend_tests(
     source_files = _read_files_from_paths(
         backend_summary.files_modified + backend_summary.files_created
     )
+
+    stuck_counts: dict[str, int] = {}
 
     for attempt in range(1, _CORRECTION_MAX_ATTEMPTS + 1):
         failed = [c for c in best if c.status == TestStatus.failed]
@@ -499,6 +557,17 @@ def _correct_backend_tests(
             if corrected is None:
                 print(f"{_LOG_PREFIX} warning: correction for {rel_path} returned no parseable code — skipping")
                 continue
+
+            if corrected.strip() == current_content.strip():
+                stuck_counts[rel_path] = stuck_counts.get(rel_path, 0) + 1
+                if stuck_counts[rel_path] >= 2:
+                    print(f"{_LOG_PREFIX} deleting stuck test (correction produces no change): {Path(rel_path).name}")
+                    abs_path.unlink()
+                    git_utils.commit_changes([rel_path], f"[auto-fix] delete stuck test: {rel_path}")
+                    any_fixed = True
+                continue
+
+            stuck_counts[rel_path] = 0
             git_utils.write_file(rel_path, corrected)
             git_utils.commit_changes([rel_path], f"[auto-fix] correct test: {rel_path}")
             any_fixed = True
@@ -866,7 +935,7 @@ def _run_backend_tests(backend_summary: ChangeSummary) -> list[TestCase]:
         )
         if not results_file.exists():
             # Build or runtime failure — surface stderr as a failed test case
-            err = (proc.stderr or proc.stdout or "no output")[:500]
+            err = (proc.stderr or proc.stdout or "no output")[:2000]
             print(f"{_LOG_PREFIX} dotnet test produced no results file — stderr: {err}")
             return [TestCase(
                 name="dotnet_build_or_runtime_error",
