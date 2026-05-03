@@ -171,6 +171,18 @@ Common issues to check first:
 - Wrong component under test: the test file name tells you what to test — \
   Header.test.tsx must test the Header component, TaskForm.test.tsx must test TaskForm, etc. \
   Never replace a test for one component with tests for a different component.
+- Unstable mock function references causing useEffect re-firing: if a vi.mock factory \
+  creates vi.fn() inline like `useX: () => ({ fetchData: vi.fn() })`, each call to useX() \
+  returns a NEW vi.fn() reference. When a component's useEffect depends on that function \
+  (e.g. `[activeTask, fetchData]`), every render changes the reference and re-fires the \
+  effect, resetting state. FIX: use vi.hoisted() so the same function instance is returned \
+  on every render: \
+  `const m = vi.hoisted(() => ({ fetchData: vi.fn() })); \
+   vi.mock('../hooks/useX', () => ({ useX: () => ({ fetchData: m.fetchData }) }));`
+- DOM selector not found (getByTestId / getByRole / getByText): verify the selector exists \
+  in source_files. If a test uses getByTestId('x') but data-testid="x" does not appear \
+  anywhere in source_files, rewrite the assertion to use a selector that actually exists \
+  (getByRole, getByText, getByLabelText, etc.).
 - Use vi.fn() / vi.mock() / vi.stubGlobal() — never jest.*
 YOUR RESPONSE MUST START WITH { AND END WITH }.
 Do not write any explanation before or after.

@@ -45,6 +45,17 @@ You receive a JSON object with these keys:
 - Use `@testing-library/user-event` for interaction tests.
 - Use `describe` blocks to group tests by component or hook.
 - Test file names must match the source file suffixed with `.test.tsx` or `.test.ts`.
+- **Stable mock function references — always use `vi.hoisted()`:** Never create `vi.fn()` inside a `vi.mock` factory inline like `useX: () => ({ fetchData: vi.fn() })`. Each call to `useX()` would return a NEW function reference, causing any `useEffect` that depends on that function to re-fire on every render and reset component state. This makes tab-switch tests, modal tests, and any test that relies on state persistence across a user interaction impossible to write correctly. Always use `vi.hoisted()` instead:
+  ```typescript
+  const mocks = vi.hoisted(() => ({
+    fetchData: vi.fn().mockResolvedValue(undefined),
+  }));
+  vi.mock('../hooks/useX', () => ({
+    useX: () => ({ fetchData: mocks.fetchData }),
+  }));
+  ```
+  This gives every render the same stable function reference, so `useEffect([dep, fetchData])` only fires when `dep` changes — not on every re-render.
+- **Only use selectors that exist in the source:** Before writing `getByTestId('x')`, verify that `data-testid="x"` literally appears in the component source. If it does not, use `getByRole`, `getByText`, or `getByLabelText` instead. Never assume a component has a `data-testid` that is not in source_files.
 - **Child component mock rule — no prop text as children:** When mocking a child component (e.g. WeatherIcon), the mock MUST render an empty placeholder — never render prop values as text children. Correct: `<span data-testid="weather-icon" />`. Wrong: `<span data-testid="weather-icon">{condition}</span>` or `<span role="img" aria-label={condition}>{condition}</span>`. Rendering props as text creates duplicate text nodes — the mock AND the parent both display the same string — causing `getByText` to fail with "found multiple elements". If you must render something for aria accessibility, use `aria-label={condition}` only, with no text children: `<span data-testid="weather-icon" aria-label={condition} />`.
 - **Duplicate text assertion rule:** If for any reason a text string could appear in more than one element (e.g., once in a mock and once in the parent), always use `getAllByText(string)` and assert `length > 0` — never `getByText(string)` which requires exactly one match.
 
