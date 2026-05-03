@@ -76,7 +76,9 @@ describe('CommentPanel interaction test', () => {
     );
 
     const activityTab = screen.getByRole('button', { name: 'Show activity tab' });
-    await user.click(activityTab);
+    await act(async () => {
+      await user.click(activityTab);
+    });
 
     expect(screen.getByText('No activity recorded yet.')).toBeInTheDocument();
   });
@@ -91,7 +93,7 @@ describe('useComments fetchComments error case', () => {
     }));
 
     const { renderHook } = await import('@testing-library/react');
-    const { useComments: useCommentsReal } = await import('../hooks/useComments?real');
+    const { useComments: useCommentsReal } = await import('../hooks/useComments');
 
     const { result } = renderHook(() => useCommentsReal());
 
