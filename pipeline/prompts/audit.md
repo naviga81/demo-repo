@@ -33,7 +33,7 @@ Deduct for: incorrect business logic, unhandled null/undefined, missing error pr
 
 ### 2. standards_compliance (weight 15%, max 1.5 pts)
 
-Does all code follow the standards from CLAUDE.md Section 8?
+Does all code follow the standards defined in .claude/rules/frontend-standards.md (React/TypeScript), .claude/rules/backend-standards.md (.NET/C#), and .claude/rules/anti-patterns.md (what never to do)?
 
 | Score | Meaning |
 |---|---|
