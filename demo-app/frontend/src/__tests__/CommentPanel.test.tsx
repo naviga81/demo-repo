@@ -82,3 +82,48 @@ describe('CommentPanel', () => {
     expect(container.firstChild).toBeNull();
   });
 });
+
+describe('useComments fetchComments error case - sets fetchError when response is not ok', () => {
+  it('sets fetchError when response is not ok', async () => {
+    vi.resetModules();
+
+    const fetchError = 'Failed to load comments. Please try again.';
+
+    vi.doMock('../hooks/useComments', () => ({
+      useComments: () => ({
+        comments: [],
+        fetchLoading: false,
+        fetchError,
+        fetchComments: vi.fn().mockResolvedValue(undefined),
+        postComment: vi.fn().mockResolvedValue(null),
+      }),
+    }));
+
+    vi.doMock('../hooks/useActivity', () => ({
+      useActivity: () => ({
+        entries: [],
+        fetchLoading: false,
+        fetchError: null,
+        fetchActivity: vi.fn().mockResolvedValue(undefined),
+      }),
+    }));
+
+    vi.doMock('../components/ActivityFeed', () => ({
+      ActivityFeed: () => <div data-testid="activity-feed" />,
+    }));
+
+    const { CommentPanel: CommentPanelFresh } = await import('../components/CommentPanel');
+
+    render(
+      <CommentPanelFresh
+        activeTask={activeTask}
+        onClose={vi.fn()}
+        onCommentAdded={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed to load comments. Please try again.')).toBeInTheDocument();
+    });
+  });
+});
