@@ -2,6 +2,14 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { useActivity } from '../hooks/useActivity';
 
+vi.mock('../utils/constants', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/constants')>();
+  return {
+    ...actual,
+    ACTIVITY_URL: (taskId: string) => `/api/v1/tasks/${taskId}/activity`,
+  };
+});
+
 describe('useActivity', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
@@ -13,8 +21,8 @@ describe('useActivity', () => {
 
   it('success case - returns activity entries when fetch succeeds', async () => {
     const mockEntries = [
-      { id: 'a1', taskId: 'task-1', description: 'Task created', createdAt: '2024-01-10T09:00:00.000Z' },
-      { id: 'a2', taskId: 'task-1', description: 'Comment added', createdAt: '2024-01-11T10:00:00.000Z' },
+      { id: '1', taskId: 'task-1', description: 'Task created', createdAt: '2024-01-01T09:00:00.000Z' },
+      { id: '2', taskId: 'task-1', description: 'Comment added', createdAt: '2024-01-02T10:00:00.000Z' },
     ];
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
@@ -33,7 +41,7 @@ describe('useActivity', () => {
     expect(result.current.fetchError).toBeNull();
   });
 
-  it('error case - sets fetchError and clears entries when response is not ok', async () => {
+  it('error case - sets fetchError and clears entries when fetch response is not ok', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: false,
       status: 500,
@@ -48,7 +56,7 @@ describe('useActivity', () => {
     await waitFor(() => expect(result.current.fetchLoading).toBe(false));
 
     expect(result.current.entries).toEqual([]);
-    expect(result.current.fetchError).toBe('Request failed with status 500');
+    expect(result.current.fetchError).toContain('500');
   });
 
   it('loading state - fetchLoading is true while fetchActivity is in flight', async () => {

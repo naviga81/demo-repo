@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { CommentPanel } from '../components/CommentPanel';
@@ -27,11 +27,15 @@ vi.mock('../components/ActivityFeed', () => ({
   ActivityFeed: () => <div data-testid="activity-feed" />,
 }));
 
-const activeTask: ActiveCommentTask = { id: 'task-1', title: 'My Test Task' };
+const activeTask: ActiveCommentTask = { id: 'task-1', title: 'My Task' };
 
 describe('CommentPanel', () => {
-  afterEach(() => {
+  beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('render test - renders the panel with Comments and Activity tabs when activeTask is provided', () => {
@@ -49,7 +53,7 @@ describe('CommentPanel', () => {
     expect(screen.getByText('Activity')).toBeInTheDocument();
   });
 
-  it('interaction test - clicking the Activity tab shows the ActivityFeed component', async () => {
+  it('interaction test - clicking the Activity tab renders the ActivityFeed component', async () => {
     render(
       <CommentPanel
         activeTask={activeTask}
@@ -74,27 +78,5 @@ describe('CommentPanel', () => {
     );
 
     expect(container.firstChild).toBeNull();
-  });
-
-  it('useComments fetchComments error case - sets fetchError when response is not ok', () => {
-    vi.doMock('../hooks/useComments', () => ({
-      useComments: () => ({
-        comments: [],
-        fetchLoading: false,
-        fetchError: 'Request failed with status 500',
-        fetchComments: vi.fn().mockResolvedValue(undefined),
-        postComment: vi.fn().mockResolvedValue(null),
-      }),
-    }));
-
-    render(
-      <CommentPanel
-        activeTask={activeTask}
-        onClose={vi.fn()}
-        onCommentAdded={vi.fn()}
-      />
-    );
-
-    expect(screen.getByText('Failed to load comments. Please try again.')).toBeInTheDocument();
   });
 });

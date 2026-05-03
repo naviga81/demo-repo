@@ -1,7 +1,6 @@
 using DemoApp.Api.Controllers;
 using DemoApp.Api.DTOs;
 using DemoApp.Api.Services;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Xunit;
@@ -17,21 +16,15 @@ public sealed class ActivityControllerTests
     {
         _mockActivityService = new Mock<IActivityService>();
         _sut = new ActivityController(_mockActivityService.Object);
-        _sut.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext()
-        };
     }
-
-    // GET /api/v1/tasks/{taskId}/activity
 
     [Fact]
     public async Task GetActivity_TaskWithEntries_Returns200WithEntryList()
     {
         IReadOnlyList<ActivityEntryDto> entries = new List<ActivityEntryDto>
         {
-            new() { Id = "a1", TaskId = "task-1", Description = "Task created", CreatedAt = "2024-01-10T09:00:00.0000000Z" },
-            new() { Id = "a2", TaskId = "task-1", Description = "Comment added", CreatedAt = "2024-01-11T10:00:00.0000000Z" },
+            new() { Id = "a1", TaskId = "task-1", Description = "Task created", CreatedAt = "2024-01-01T09:00:00.0000000Z" },
+            new() { Id = "a2", TaskId = "task-1", Description = "Comment added", CreatedAt = "2024-01-02T10:00:00.0000000Z" },
         };
         _mockActivityService
             .Setup(s => s.GetActivityByTaskIdAsync("task-1"))
@@ -48,10 +41,10 @@ public sealed class ActivityControllerTests
     [Fact]
     public async Task GetActivity_TaskWithNoEntries_Returns200WithEmptyList()
     {
-        IReadOnlyList<ActivityEntryDto> emptyList = new List<ActivityEntryDto>();
+        IReadOnlyList<ActivityEntryDto> entries = new List<ActivityEntryDto>();
         _mockActivityService
             .Setup(s => s.GetActivityByTaskIdAsync("task-empty"))
-            .ReturnsAsync(emptyList);
+            .ReturnsAsync(entries);
 
         var result = await _sut.GetActivity("task-empty");
 
