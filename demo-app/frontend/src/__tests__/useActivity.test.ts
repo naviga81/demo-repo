@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { useActivity } from '../hooks/useActivity';
 
 vi.mock('../utils/constants', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../utils/constants')>();
+  const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
     ACTIVITY_URL: (taskId: string) => `/api/v1/tasks/${taskId}/activity`,
@@ -21,8 +21,8 @@ describe('useActivity', () => {
 
   it('success case - returns activity entries when fetch succeeds', async () => {
     const mockEntries = [
-      { id: 'a1', taskId: 'task-1', description: 'Task created', createdAt: '2024-01-01T00:00:00Z' },
-      { id: 'a2', taskId: 'task-1', description: 'Comment added', createdAt: '2024-01-02T00:00:00Z' },
+      { id: 'a1', taskId: 'task-1', description: 'Task created', createdAt: '2024-01-10T09:00:00.000Z' },
+      { id: 'a2', taskId: 'task-1', description: 'Comment added', createdAt: '2024-01-11T10:00:00.000Z' },
     ];
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
@@ -41,7 +41,7 @@ describe('useActivity', () => {
     expect(result.current.fetchError).toBeNull();
   });
 
-  it('error case - sets fetchError and empties entries when response is not ok', async () => {
+  it('error case - sets fetchError and returns empty entries when fetch response is not ok', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: false,
       status: 500,

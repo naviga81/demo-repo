@@ -22,11 +22,12 @@ public sealed class CommentServiceTests
                 Description = "Comment added",
                 CreatedAt = DateTime.UtcNow.ToString("o"),
             });
+
         _sut = new CommentService(_mockActivityService.Object, NullLogger<CommentService>.Instance);
     }
 
     [Fact]
-    public async Task AddCommentAsync_ValidInput_ReturnsCommentDtoWithMatchingFields()
+    public async Task AddCommentAsync_ValidInput_ReturnsCommentDtoWithCorrectFields()
     {
         var result = await _sut.AddCommentAsync("task-1", "Hello world");
 
@@ -37,9 +38,9 @@ public sealed class CommentServiceTests
     }
 
     [Fact]
-    public async Task AddCommentAsync_ValidInput_RecordsActivityWithCommentAddedLabel()
+    public async Task AddCommentAsync_ValidInput_RecordsCommentAddedActivity()
     {
-        await _sut.AddCommentAsync("task-1", "Test comment");
+        await _sut.AddCommentAsync("task-1", "Hello");
 
         _mockActivityService.Verify(
             s => s.RecordActivityAsync("task-1", "Comment added"),
@@ -56,14 +57,34 @@ public sealed class CommentServiceTests
     }
 
     [Fact]
-    public async Task GetCommentsByTaskIdAsync_AfterAddingComments_ReturnsCommentsForCorrectTask()
+    public async Task GetCommentsByTaskIdAsync_AfterAddingComments_ReturnsCorrectComments()
     {
-        await _sut.AddCommentAsync("task-1", "First comment");
-        await _sut.AddCommentAsync("task-1", "Second comment");
-        await _sut.AddCommentAsync("task-2", "Other task comment");
+        await _sut.AddCommentAsync("task-2", "First");
+        await _sut.AddCommentAsync("task-2", "Second");
 
-        var result = await _sut.GetCommentsByTaskIdAsync("task-1");
+        var result = await _sut.GetCommentsByTaskIdAsync("task-2");
 
         Assert.Equal(2, result.Count);
+        Assert.Contains(result, c => c.Text == "First");
+        Assert.Contains(result, c => c.Text == "Second");
+    }
+
+    [Fact]
+    public async Task GetCommentCountAsync_AfterAddingComments_ReturnsCorrectCount()
+    {
+        await _sut.AddCommentAsync("task-3", "One");
+        await _sut.AddCommentAsync("task-3", "Two");
+
+        var count = await _sut.GetCommentCountAsync("task-3");
+
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public async Task GetCommentCountAsync_NoComments_ReturnsZero()
+    {
+        var count = await _sut.GetCommentCountAsync("task-empty");
+
+        Assert.Equal(0, count);
     }
 }

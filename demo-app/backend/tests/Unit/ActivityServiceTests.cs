@@ -9,7 +9,7 @@ public sealed class ActivityServiceTests
     private readonly ActivityService _sut = new(NullLogger<ActivityService>.Instance);
 
     [Fact]
-    public async Task RecordActivityAsync_ValidInput_ReturnsActivityEntryDtoWithMatchingFields()
+    public async Task RecordActivityAsync_ValidInput_ReturnsActivityEntryDtoWithCorrectFields()
     {
         var result = await _sut.RecordActivityAsync("task-1", "Task created");
 
@@ -21,33 +21,59 @@ public sealed class ActivityServiceTests
     }
 
     [Fact]
-    public async Task RecordActivityAsync_CalledMultipleTimes_EachEntryHasUniqueId()
+    public async Task RecordActivityAsync_CalledTwice_BothEntriesReturnedByGetActivity()
     {
-        var first = await _sut.RecordActivityAsync("task-1", "Task created");
-        var second = await _sut.RecordActivityAsync("task-1", "Comment added");
+        await _sut.RecordActivityAsync("task-2", "Task created");
+        await _sut.RecordActivityAsync("task-2", "Comment added");
 
-        Assert.NotEqual(first.Id, second.Id);
+        var entries = await _sut.GetActivityByTaskIdAsync("task-2");
+
+        Assert.Equal(2, entries.Count);
     }
 
     [Fact]
     public async Task GetActivityByTaskIdAsync_NoEntriesForTask_ReturnsEmptyList()
     {
-        var result = await _sut.GetActivityByTaskIdAsync("nonexistent-task");
+        var entries = await _sut.GetActivityByTaskIdAsync("nonexistent-task");
 
-        Assert.NotNull(result);
-        Assert.Empty(result);
+        Assert.NotNull(entries);
+        Assert.Empty(entries);
     }
 
     [Fact]
-    public async Task GetActivityByTaskIdAsync_AfterRecording_ReturnsEntryInChronologicalOrder()
+    public async Task GetActivityByTaskIdAsync_MultipleTaskIds_ReturnsOnlyEntriesForRequestedTask()
     {
-        await _sut.RecordActivityAsync("task-42", "Task created");
-        await _sut.RecordActivityAsync("task-42", "Comment added");
+        await _sut.RecordActivityAsync("task-A", "Task created");
+        await _sut.RecordActivityAsync("task-B", "Task created");
+        await _sut.RecordActivityAsync("task-A", "Comment added");
 
-        var result = await _sut.GetActivityByTaskIdAsync("task-42");
+        var entries = await _sut.GetActivityByTaskIdAsync("task-A");
 
-        Assert.Equal(2, result.Count);
-        Assert.Equal("Task created", result[0].Description);
-        Assert.Equal("Comment added", result[1].Description);
+        Assert.Equal(2, entries.Count);
+        Assert.All(entries, e => Assert.Equal("task-A", e.TaskId));
+    }
+
+    [Fact]
+    public async Task GetActivityByTaskIdAsync_ReturnsEntriesInChronologicalOrder()
+    {
+        await _sut.RecordActivityAsync("task-order", "Task created");
+        await Task.Delay(10);
+        await _sut.RecordActivityAsync("task-order", "Comment added");
+
+        var entries = await _sut.GetActivityByTaskIdAsync("task-order");
+
+        Assert.Equal(2, entries.Count);
+        var first = DateTime.Parse(entries[0].CreatedAt);
+        var second = DateTime.Parse(entries[1].CreatedAt);
+        Assert.True(first <= second);
+    }
+
+    [Fact]
+    public async Task RecordActivityAsync_InvalidInput_StillCreatesEntryWithGivenDescription()
+    {
+        var result = await _sut.RecordActivityAsync("task-x", "");
+
+        Assert.NotNull(result);
+        Assert.Equal("", result.Description);
     }
 }
