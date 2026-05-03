@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import { ActivityFeed } from '../components/ActivityFeed';
+import { CommentPanel } from '../components/CommentPanel';
 import type { ActivityEntry } from '../types';
 
 const makeEntry = (id: string, description: string, createdAt: string): ActivityEntry => ({
@@ -9,6 +11,25 @@ const makeEntry = (id: string, description: string, createdAt: string): Activity
   description,
   createdAt,
 });
+
+vi.mock('../hooks/useComments', () => ({
+  useComments: () => ({
+    comments: [],
+    fetchLoading: false,
+    fetchError: null,
+    fetchComments: vi.fn(),
+    postComment: vi.fn(),
+  }),
+}));
+
+vi.mock('../hooks/useActivity', () => ({
+  useActivity: () => ({
+    entries: [],
+    fetchLoading: false,
+    fetchError: null,
+    fetchActivity: vi.fn(),
+  }),
+}));
 
 describe('ActivityFeed', () => {
   it('render test - renders a list of activity entries when entries are provided', () => {
@@ -30,6 +51,28 @@ describe('ActivityFeed', () => {
 
   it('edge case - renders empty message when entries array is empty and not loading', () => {
     render(<ActivityFeed entries={[]} fetchLoading={false} fetchError={null} />);
+
+    expect(screen.getByText('No activity recorded yet.')).toBeInTheDocument();
+  });
+});
+
+describe('CommentPanel interaction test', () => {
+  it('clicking the Activity tab renders the ActivityFeed component', async () => {
+    const user = userEvent.setup();
+    const activeTask = { id: 'task-1', title: 'My Task' };
+    const onClose = vi.fn();
+    const onCommentAdded = vi.fn();
+
+    render(
+      <CommentPanel
+        activeTask={activeTask}
+        onClose={onClose}
+        onCommentAdded={onCommentAdded}
+      />
+    );
+
+    const activityTab = screen.getByRole('button', { name: 'Show activity tab' });
+    await user.click(activityTab);
 
     expect(screen.getByText('No activity recorded yet.')).toBeInTheDocument();
   });
