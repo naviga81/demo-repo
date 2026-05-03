@@ -30,7 +30,7 @@ import git_utils  # noqa: E402
 
 _MODEL = "claude-sonnet-4-6"
 _MAX_TOKENS = 16000
-_REVIEW_MAX_TOKENS = 1024
+_REVIEW_MAX_TOKENS = 4096
 _VISUAL_MAX_TOKENS = 256
 _MAX_SLUG_LENGTH = 30
 _FRONTEND_ROOT = "demo-app/frontend"
