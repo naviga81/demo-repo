@@ -22,7 +22,7 @@ vi.mock('../hooks/useActivity', () => ({
   }),
 }));
 
-vi.mock('./ActivityFeed', () => ({
+vi.mock('../components/ActivityFeed', () => ({
   ActivityFeed: () => <div data-testid="activity-feed" />,
 }));
 
