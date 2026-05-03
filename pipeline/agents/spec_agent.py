@@ -81,6 +81,7 @@ def run(
 
     lld = _build_lld_document(raw, work_item_id)
     lld_path = _write_lld_document(lld, work_item_id, structured_spec.title)
+    _write_lld_template(lld, structured_spec, work_item_id)
     _post_lld_comment(lld_path, work_item_id, ado_client)
 
     print(
@@ -356,6 +357,78 @@ def _write_lld_document(lld: LLDDocument, work_item_id: str, title: str) -> str:
     lld_path.parent.mkdir(parents=True, exist_ok=True)
     lld_path.write_text(_render_lld_markdown(lld, work_item_id), encoding="utf-8")
     return str(lld_path.relative_to(_REPO_ROOT))
+
+
+def _write_lld_template(lld: LLDDocument, spec: StructuredSpec, work_item_id: str) -> None:
+    """Write a pre-populated LLD planning template to pipeline/templates/lld-template/."""
+    slug = re.sub(r"[^a-z0-9\s-]", "", spec.title.lower())
+    slug = "-".join(slug.split()[:3])[:30].rstrip("-")
+    path = _PIPELINE_DIR / "templates" / "lld-template" / f"LLD_WI-{work_item_id}_{slug}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    lines = [
+        f"# LLD Planning Template — WI-{work_item_id}",
+        "",
+        f"_Generated: {ts} | Confidence: {spec.confidence_score}_",
+        "",
+        "## Acceptance Criteria",
+        "",
+    ]
+    for i, ac in enumerate(spec.acceptance_criteria, 1):
+        lines.append(f"{i}. {ac}")
+    lines += [
+        "",
+        "## Files",
+        "",
+        "| Action | Path |",
+        "|---|---|",
+    ]
+    for f in lld.files_to_create:
+        lines.append(f"| create | `{f}` |")
+    for f in lld.files_to_modify:
+        lines.append(f"| modify | `{f}` |")
+    lines += [
+        "",
+        "## Frontend Components",
+        "",
+        "| Component | Action | Notes |",
+        "|---|---|---|",
+    ]
+    fe = lld.frontend_changes
+    for c in fe.components_to_create:
+        lines.append(f"| {c} | create | |")
+    for c in fe.components_to_modify:
+        lines.append(f"| {c} | modify | |")
+    lines += [
+        "",
+        "## Backend Endpoints",
+        "",
+        "| Method | Path | Notes |",
+        "|---|---|---|",
+    ]
+    for ep in lld.backend_changes.endpoints:
+        lines.append(f"| {ep.method} | `{ep.path}` | |")
+    lines += [
+        "",
+        f"**Services:** {', '.join(lld.backend_changes.services) or 'none'}",
+        f"**Models:** {', '.join(lld.backend_changes.data_models) or 'none'}",
+        "",
+        "## New Dependencies",
+        "",
+    ]
+    if lld.new_dependencies.frontend:
+        lines.append(f"**npm:** {', '.join(lld.new_dependencies.frontend)}")
+    if lld.new_dependencies.backend:
+        lines.append(f"**NuGet:** {', '.join(lld.new_dependencies.backend)}")
+    if not lld.new_dependencies.frontend and not lld.new_dependencies.backend:
+        lines.append("_(none)_")
+    if spec.gaps:
+        lines += ["", "## Risk Flags", ""]
+        for g in spec.gaps:
+            lines.append(f"- {g}")
+
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def _post_lld_comment(lld_path: str, work_item_id: str, ado_client: ADOClient) -> None:

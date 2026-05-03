@@ -19,7 +19,7 @@ Self-corrects build errors and assertion failures before reporting results.
 
 - Committed test files on the feature branch
 - `TestResults` JSON (passed to Audit and Supervisor agents)
-- `outputs/_TestResults.md` — full per-test breakdown (pass/fail/skipped per file)
+- `outputs/test-reports/TestReport_WI-{id}_{slug}.md` — full per-test breakdown (pass/fail/skipped per file)
 
 ## Test Rules (summary — full rules in `.claude/rules/testing-standards.md`)
 

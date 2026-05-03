@@ -204,6 +204,138 @@ def _write_audit_report_doc(report: Any, work_item_id: str, title: str) -> str:
     return str(path.relative_to(_REPO_ROOT))
 
 
+def _write_test_plan_template(run: PipelineRun, work_item_id: str) -> None:
+    """Write a pre-populated test-plan template to pipeline/templates/test-plan-template/."""
+    spec = run.clarification_output.spec  # type: ignore[union-attr]
+    lld = run.lld_document  # type: ignore[union-attr]
+    slug = _make_report_slug(spec.title)
+    path = _PIPELINE_DIR / "templates" / "test-plan-template" / f"TestPlan_WI-{work_item_id}_{slug}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    fe = lld.frontend_changes
+    be = lld.backend_changes
+
+    lines = [
+        f"# Test Plan Template — WI-{work_item_id}",
+        "",
+        f"_Generated: {ts}_",
+        "",
+        "## Acceptance Criteria Under Test",
+        "",
+    ]
+    for i, ac in enumerate(spec.acceptance_criteria, 1):
+        lines.append(f"{i}. {ac}")
+    lines += [
+        "",
+        "## Frontend Files to Test",
+        "",
+        "| File | Component | Test Type |",
+        "|---|---|---|",
+    ]
+    for f in lld.files_to_create + lld.files_to_modify:
+        if "frontend" in f.lower() or f.endswith(".tsx") or f.endswith(".ts"):
+            lines.append(f"| `{f}` | | render / interaction / edge |")
+    lines += [
+        "",
+        "## Component Test Requirements",
+        "",
+        "| Component | Render | Interaction | Edge Case |",
+        "|---|---|---|---|",
+    ]
+    for c in fe.components_to_create:
+        lines.append(f"| {c} | [ ] | [ ] | [ ] |")
+    lines += [
+        "",
+        "## Endpoint Test Requirements",
+        "",
+        "| Endpoint | 2xx | 4xx | 5xx |",
+        "|---|---|---|---|",
+    ]
+    for ep in be.endpoints:
+        lines.append(f"| {ep.method} {ep.path} | [ ] | [ ] | [ ] |")
+    lines += [
+        "",
+        "## Coverage Target",
+        "",
+        "| File | Min Coverage |",
+        "|---|---|",
+    ]
+    for f in lld.files_to_create + lld.files_to_modify:
+        lines.append(f"| `{f}` | 70% |")
+    if spec.suggested_user_stories:
+        lines += ["", "## Gherkin Scenarios", ""]
+        for s in spec.suggested_user_stories:
+            lines.append(f"- {s}")
+
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _write_audit_criteria_template(run: PipelineRun, work_item_id: str) -> None:
+    """Write a pre-populated audit-criteria template to pipeline/templates/audit-criteria-template/."""
+    spec = run.clarification_output.spec  # type: ignore[union-attr]
+    lld = run.lld_document  # type: ignore[union-attr]
+    slug = _make_report_slug(spec.title)
+    path = _PIPELINE_DIR / "templates" / "audit-criteria-template" / f"Audit_WI-{work_item_id}_{slug}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    lines = [
+        f"# Audit Criteria Template — WI-{work_item_id}",
+        "",
+        f"_Generated: {ts}_",
+        "",
+        "## Acceptance Criteria",
+        "",
+    ]
+    for i, ac in enumerate(spec.acceptance_criteria, 1):
+        lines.append(f"{i}. {ac}")
+    lines += [
+        "",
+        "## Audit Category Checklist",
+        "",
+        "| Category | Weight | Pass Threshold | Status |",
+        "|---|---|---|---|",
+        "| Code Correctness | 20% | ≥ 7/10 | [ ] |",
+        "| Standards Compliance | 15% | ≥ 7/10 | [ ] |",
+        "| Test Coverage | 20% | ≥ 7/10 | [ ] |",
+        "| Security | 20% | No HIGH/CRITICAL | [ ] |",
+        "| Spec Adherence | 10% | > 0/10 | [ ] |",
+        "| Performance | 10% | ≥ 5/10 | [ ] |",
+        "| Documentation | 5% | ≥ 5/10 | [ ] |",
+        "",
+        "## Files Under Review",
+        "",
+        "**Frontend:**",
+        "",
+    ]
+    for f in lld.files_to_create + lld.files_to_modify:
+        if "frontend" in f.lower() or f.endswith(".tsx") or f.endswith(".ts"):
+            lines.append(f"- `{f}`")
+    lines += ["", "**Backend:**", ""]
+    for f in lld.files_to_create + lld.files_to_modify:
+        if "backend" in f.lower() or f.endswith(".cs"):
+            lines.append(f"- `{f}`")
+    lines += [
+        "",
+        "## Blocking Conditions",
+        "",
+        "- Any security finding severity HIGH or CRITICAL → **auto-reject**",
+        "- Any failing test → **auto-reject**",
+        "- Spec adherence score = 0 → **auto-reject**",
+        "",
+        "## Merge Threshold",
+        "",
+        "| Score | Outcome |",
+        "|---|---|",
+        "| ≥ 8.0 | Auto-merge |",
+        "| 7.0 – 7.99 | Draft PR, human review |",
+        "| < 7.0 | Pipeline failed |",
+    ]
+
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 class Orchestrator:
     """Central controller for the AI-powered SDLC automation pipeline.
 
@@ -865,6 +997,8 @@ class Orchestrator:
         if run.clarification_output is None or run.clarification_output.spec is None:
             raise RuntimeError("Test Agent: structured_spec is missing from pipeline run")
 
+        _write_test_plan_template(run, work_item_id)
+
         result = test_agent.run(
             run.frontend_summary,
             run.backend_summary,
@@ -914,6 +1048,8 @@ class Orchestrator:
             raise RuntimeError("Audit Agent: lld_document is missing from pipeline run")
         if run.clarification_output is None or run.clarification_output.spec is None:
             raise RuntimeError("Audit Agent: structured_spec is missing from pipeline run")
+
+        _write_audit_criteria_template(run, work_item_id)
 
         report = audit_agent.run(
             run.frontend_summary,
