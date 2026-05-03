@@ -1,18 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, renderHook, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { CommentPanel } from '../components/CommentPanel';
+import { useComments } from '../hooks/useComments';
 import type { ActiveCommentTask } from '../types';
-
-vi.mock('../hooks/useComments', () => ({
-  useComments: () => ({
-    comments: [],
-    fetchLoading: false,
-    fetchError: null,
-    fetchComments: vi.fn().mockResolvedValue(undefined),
-    postComment: vi.fn().mockResolvedValue({ id: 'c1', taskId: 'task-1', text: 'Hello', createdAt: '2024-01-01T00:00:00Z' }),
-  }),
-}));
 
 vi.mock('../hooks/useActivity', () => ({
   useActivity: () => ({
@@ -39,6 +30,16 @@ describe('CommentPanel', () => {
   });
 
   it('render test - renders the panel with the Comments and Activity tabs visible', () => {
+    vi.mock('../hooks/useComments', () => ({
+      useComments: () => ({
+        comments: [],
+        fetchLoading: false,
+        fetchError: null,
+        fetchComments: vi.fn().mockResolvedValue(undefined),
+        postComment: vi.fn().mockResolvedValue({ id: 'c1', taskId: 'task-1', text: 'Hello', createdAt: '2024-01-01T00:00:00Z' }),
+      }),
+    }));
+
     render(
       <CommentPanel
         activeTask={activeTask}
@@ -78,5 +79,33 @@ describe('CommentPanel', () => {
     );
 
     expect(container.firstChild).toBeNull();
+  });
+});
+
+describe('useComments', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('fetchComments error case - sets fetchError when response is not ok', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+      })
+    );
+
+    const { result } = renderHook(() => useComments());
+
+    await act(async () => {
+      await result.current.fetchComments('task-1');
+    });
+
+    expect(result.current.fetchError).toBe('Request failed with status 500');
   });
 });
