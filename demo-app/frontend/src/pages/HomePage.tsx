@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { TaskCard } from '../components/TaskCard';
 import { TaskForm } from '../components/TaskForm';
 import { LoadMoreButton } from '../components/LoadMoreButton';
@@ -75,7 +75,7 @@ export function HomePage() {
     filteredTasks,
   } = useTaskSearch(priorityFilteredTasks);
 
-  const allStatTasks = [...allTasks, ...completedTasks];
+  const allStatTasks = useMemo(() => allTasks, [allTasks]);
 
   useEffect(() => {
     if (visibleTasks.length === 0) return;
