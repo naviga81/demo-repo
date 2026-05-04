@@ -695,6 +695,10 @@ def _strip_foreign_describe_blocks(content: str, file_stem: str) -> str:
     Only top-level describe calls (at column 0) are considered; nested describes
     (which are indented) are ignored by the regex anchor.
 
+    Never removes the last remaining describe block — a single-block file whose
+    one block is foreign is a different class of problem (the whole file has the
+    wrong content) and is logged as a warning instead.
+
     Applied to every frontend .test.tsx/.test.ts file at three points:
       1. On pipeline start — clean contamination from previous runs.
       2. After Claude writes new test files — before they are committed.
@@ -705,12 +709,20 @@ def _strip_foreign_describe_blocks(content: str, file_stem: str) -> str:
     result = content
     while changed:
         changed = False
-        for m in _TOP_LEVEL_DESCRIBE_RE.finditer(result):
+        all_blocks = list(_TOP_LEVEL_DESCRIBE_RE.finditer(result))
+        if len(all_blocks) <= 1:
+            if all_blocks and not all_blocks[0].group(1).lower().startswith(norm_stem):
+                print(
+                    f"{_LOG_PREFIX} warning: {file_stem} test file contains only a "
+                    f"foreign describe block '{all_blocks[0].group(1)}' — "
+                    "skipping strip (entire file may need replacement)"
+                )
+            break
+        for m in all_blocks:
             block_name = m.group(1).lower()
             if not block_name.startswith(norm_stem):
                 start = m.start()
                 end = _find_describe_block_end(result, start)
-                # Remove the block and any leading blank line before it
                 prefix = result[:start].rstrip("\n")
                 suffix = result[end:].lstrip("\n")
                 result = prefix + ("\n\n" if prefix else "") + suffix

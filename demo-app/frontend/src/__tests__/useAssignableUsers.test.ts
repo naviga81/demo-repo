@@ -1,13 +1,12 @@
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { useComments } from '../hooks/useComments';
+import { useAssignableUsers } from '../hooks/useAssignableUsers';
 
 vi.mock('../utils/constants', () => ({
-  COMMENTS_URL: vi.fn((taskId: string) => `/api/v1/tasks/${taskId}/comments`),
-  COMMENT_MAX_LENGTH: 500,
+  USERS_URL: '/api/v1/users',
 }));
 
-describe('useComments', () => {
+describe('useAssignableUsers', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
   });
@@ -16,62 +15,46 @@ describe('useComments', () => {
     vi.restoreAllMocks();
   });
 
-  it('success case - returns users array when fetch succeeds', async () => {
-    const mockComments = [
-      { id: '1', taskId: 'task1', text: 'Hello', createdAt: '2024-01-01T00:00:00Z' },
-      { id: '2', taskId: 'task1', text: 'World', createdAt: '2024-01-02T00:00:00Z' },
-    ];
+  it('success case - returns user names when fetch succeeds', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
-      json: async () => mockComments,
+      json: async () => ({ users: [{ id: 1, name: 'Alice' }, { id: 2, name: 'Bob' }] }),
     });
 
-    const { result } = renderHook(() => useComments());
+    const { result } = renderHook(() => useAssignableUsers());
 
-    await act(async () => {
-      await result.current.fetchComments('task1');
-    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
 
-    await waitFor(() => expect(result.current.fetchLoading).toBe(false));
-
-    expect(result.current.comments).toEqual(mockComments);
-    expect(result.current.fetchError).toBeNull();
+    expect(result.current.users).toEqual(['Alice', 'Bob']);
+    expect(result.current.error).toBeNull();
   });
 
-  it('error case - sets error and returns empty users when fetch response is not ok', async () => {
+  it('error case - sets error message when fetch response is not ok', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: false,
       status: 500,
     });
 
-    const { result } = renderHook(() => useComments());
+    const { result } = renderHook(() => useAssignableUsers());
 
-    await act(async () => {
-      await result.current.fetchComments('task1');
-    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
 
-    await waitFor(() => expect(result.current.fetchLoading).toBe(false));
-
-    expect(result.current.comments).toEqual([]);
-    expect(result.current.fetchError).not.toBeNull();
+    expect(result.current.users).toEqual([]);
+    expect(result.current.error).toBe('Request failed with status 500');
   });
 
-  it('loading state - fetchLoading is true while fetchComments is in flight', async () => {
+  it('loading state - loading is true on initial render before fetch completes', async () => {
     let resolve!: (value: unknown) => void;
     const pending = new Promise((r) => { resolve = r; });
     (fetch as ReturnType<typeof vi.fn>).mockReturnValueOnce(pending);
 
-    const { result } = renderHook(() => useComments());
+    const { result } = renderHook(() => useAssignableUsers());
 
-    act(() => {
-      result.current.fetchComments('task1');
-    });
-
-    await waitFor(() => expect(result.current.fetchLoading).toBe(true));
+    expect(result.current.loading).toBe(true);
 
     await act(async () => {
-      resolve({ ok: true, json: async () => [] });
+      resolve({ ok: true, json: async () => ({ users: [] }) });
     });
-    await waitFor(() => expect(result.current.fetchLoading).toBe(false));
+    await waitFor(() => expect(result.current.loading).toBe(false));
   });
 });
