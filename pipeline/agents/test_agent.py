@@ -215,6 +215,20 @@ Common issues to check first:
   in source_files. If a test uses getByTestId('x') but data-testid="x" does not appear \
   anywhere in source_files, rewrite the assertion to use a selector that actually exists \
   (getByRole, getByText, getByLabelText, etc.).
+- localStorage with useState lazy initializer: if a hook reads localStorage inside a \
+  `useState` lazy initializer (`useState(readFromStorage)`), you MUST use \
+  `vi.stubGlobal('localStorage', makeLocalStorageMock({ key: 'value' }))` \
+  — do NOT use `vi.spyOn(Storage.prototype, 'getItem')`. \
+  In JSDOM, prototype spies do not intercept calls made during React's lazy initialization \
+  phase because JSDOM resolves getItem on the instance, not the prototype. \
+  `vi.stubGlobal` replaces the entire object before the hook initialises. \
+  Always restore with `vi.unstubAllGlobals()` in afterEach (not `vi.restoreAllMocks()`). \
+  Pattern: \
+  `function makeLocalStorageMock(initial = {}) { const store = {...initial}; return { \
+   getItem: vi.fn((k) => store[k] ?? null), \
+   setItem: vi.fn((k, v) => { store[k] = v; }), \
+   removeItem: vi.fn((k) => { delete store[k]; }) }; }` \
+  Then in each test: `vi.stubGlobal('localStorage', makeLocalStorageMock({ storageKey: 'value' }));`
 - Use vi.fn() / vi.mock() / vi.stubGlobal() — never jest.*
 YOUR RESPONSE MUST START WITH { AND END WITH }.
 Do not write any explanation before or after.

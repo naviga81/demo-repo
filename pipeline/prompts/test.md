@@ -41,7 +41,20 @@ You receive a JSON object with these keys:
 **Frontend coding rules:**
 - Use named imports matching exactly what the source file exports — check `source_files` first.
 - Mock all fetch/API calls with `vi.fn()` — never call real APIs.
-- Mock `localStorage` using `vi.stubGlobal('localStorage', createLocalStorageMock())` or `vi.spyOn(Storage.prototype, 'getItem')` — never read from or write to real browser storage in tests.
+- Mock `localStorage` using `vi.stubGlobal('localStorage', makeLocalStorageMock())` — never use `vi.spyOn(Storage.prototype, 'getItem')` for hooks that read localStorage inside a `useState` lazy initializer (`useState(readFromStorage)`). In JSDOM, `Storage.prototype` spies do not intercept calls made during React's lazy initialization phase because JSDOM resolves `getItem` on the instance before reaching the prototype chain. Always use `vi.stubGlobal` and restore with `vi.unstubAllGlobals()` in `afterEach`. Example:
+  ```typescript
+  function makeLocalStorageMock(initial: Record<string, string> = {}) {
+    const store: Record<string, string> = { ...initial };
+    return {
+      getItem: vi.fn((key: string): string | null => store[key] ?? null),
+      setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
+      removeItem: vi.fn((key: string) => { delete store[key]; }),
+      clear: vi.fn(() => { Object.keys(store).forEach((k) => delete store[k]); }),
+    };
+  }
+  // In each test: vi.stubGlobal('localStorage', makeLocalStorageMock({ storageKey: 'storedValue' }));
+  // In afterEach: vi.unstubAllGlobals();
+  ```
 - Use `@testing-library/user-event` for interaction tests.
 - Use `describe` blocks to group tests by component or hook.
 - Test file names must match the source file suffixed with `.test.tsx` or `.test.ts`.
