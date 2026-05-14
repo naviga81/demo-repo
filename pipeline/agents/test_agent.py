@@ -1123,6 +1123,7 @@ def _run_frontend_tests() -> list[TestCase]:
             capture_output=True,
             text=True,
             timeout=_TEST_RUNNER_TIMEOUT,
+            shell=True,  # Use shell to ensure npx works across platforms
         )
         return _parse_vitest_output(result.stdout or result.stderr)
     except Exception as exc:
@@ -1161,6 +1162,7 @@ def _run_backend_tests(backend_summary: ChangeSummary) -> list[TestCase]:
             capture_output=True,
             text=True,
             timeout=_TEST_RUNNER_TIMEOUT,
+            shell=True,  # Use shell to ensure dotnet works across platforms
         )
         if not results_file.exists():
             # Build or runtime failure — surface stderr as a failed test case
