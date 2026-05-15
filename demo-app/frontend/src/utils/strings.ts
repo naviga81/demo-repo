@@ -24,6 +24,9 @@ export const LABEL_SUBMIT_ERROR = 'Failed to create task. Please try again.';
 export const LABEL_TITLE_PLACEHOLDER = 'Enter task title';
 export const LABEL_DESCRIPTION_PLACEHOLDER = 'Enter task description (optional)';
 
+export const LABEL_REMARKS = 'Remarks';
+export const LABEL_REMARKS_PLACEHOLDER = 'Optional remarks (max 50 characters)';
+
 export const LABEL_WEATHER_LOADING = 'Loading weather...';
 export const LABEL_WEATHER_ERROR = 'Weather unavailable';
 export const LABEL_WEATHER_ARIA = 'Current weather';
