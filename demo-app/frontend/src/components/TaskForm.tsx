@@ -22,7 +22,10 @@ import {
   LABEL_TITLE,
   LABEL_TITLE_PLACEHOLDER,
   LABEL_TITLE_REQUIRED,
+  LABEL_RESET,
+  LABEL_RESET_ARIA,
 } from '../utils/strings';
+import { ResetConfirmationDialog } from './ResetConfirmationDialog';
 
 export interface TaskFormProps {
   onTaskCreated: (task: Task) => void;
@@ -52,6 +55,7 @@ export function TaskForm({ onTaskCreated }: TaskFormProps) {
   const [titleError, setTitleError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState<boolean>(false);
 
   const { users } = useAssignableUsers();
 
@@ -115,6 +119,19 @@ export function TaskForm({ onTaskCreated }: TaskFormProps) {
 
   const handleRemarksChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setRemarks(e.target.value);
+  };
+
+  const handleResetRequest = () => {
+    setIsResetDialogOpen(true);
+  };
+
+  const handleResetConfirm = () => {
+    resetForm();
+    setIsResetDialogOpen(false);
+  };
+
+  const handleResetCancel = () => {
+    setIsResetDialogOpen(false);
   };
 
   return (
@@ -270,15 +287,31 @@ export function TaskForm({ onTaskCreated }: TaskFormProps) {
           </p>
         )}
 
-        <button
-          type="submit"
-          aria-label={LABEL_ADD_TASK_ARIA}
-          disabled={submitting}
-          className="self-start px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {LABEL_ADD_TASK}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            aria-label={LABEL_ADD_TASK_ARIA}
+            disabled={submitting}
+            className="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {LABEL_ADD_TASK}
+          </button>
+          <button
+            type="button"
+            aria-label={LABEL_RESET_ARIA}
+            onClick={handleResetRequest}
+            className="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          >
+            {LABEL_RESET}
+          </button>
+        </div>
       </form>
+
+      <ResetConfirmationDialog
+        isOpen={isResetDialogOpen}
+        onConfirm={handleResetConfirm}
+        onCancel={handleResetCancel}
+      />
     </section>
   );
 }

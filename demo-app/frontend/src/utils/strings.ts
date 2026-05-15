@@ -111,3 +111,12 @@ export const LABEL_ADD_TASKS_CHEVRON_EXPAND_ARIA = 'Expand add tasks section';
 
 export const LABEL_SORT_ASCENDING_ARIA = 'Sort tasks by due date ascending';
 export const LABEL_SORT_DESCENDING_ARIA = 'Sort tasks by due date descending';
+
+export const LABEL_RESET = 'Reset';
+export const LABEL_RESET_ARIA = 'Reset form fields';
+export const LABEL_RESET_CONFIRM_MESSAGE = 'Do you want to reset the screen?';
+export const LABEL_RESET_CONFIRM_YES = 'Yes';
+export const LABEL_RESET_CONFIRM_NO = 'No';
+export const LABEL_RESET_CONFIRM_YES_ARIA = 'Confirm reset';
+export const LABEL_RESET_CONFIRM_NO_ARIA = 'Cancel reset';
+export const LABEL_RESET_DIALOG_ARIA = 'Reset confirmation dialog';
