@@ -14,6 +14,8 @@ import {
   LABEL_PRIORITY_LOW,
   LABEL_PRIORITY_MEDIUM,
   LABEL_PRIORITY_HIGH,
+  LABEL_REMARKS,
+  LABEL_REMARKS_PLACEHOLDER,
   LABEL_SUBMIT_ERROR,
   LABEL_TASK_FORM_HEADING,
   LABEL_TASK_FORM_HEADING_ICON_ARIA,
@@ -30,7 +32,9 @@ const EMPTY_TITLE = '';
 const EMPTY_DESCRIPTION = '';
 const EMPTY_DUE_DATE = '';
 const EMPTY_ASSIGNED_TO = '';
+const EMPTY_REMARKS = '';
 const DEFAULT_PRIORITY: Priority = 'medium';
+const REMARKS_MAX_LENGTH = 50;
 
 const PRIORITY_OPTIONS: Array<{ value: Priority; label: string }> = [
   { value: 'low', label: LABEL_PRIORITY_LOW },
@@ -44,6 +48,7 @@ export function TaskForm({ onTaskCreated }: TaskFormProps) {
   const [dueDate, setDueDate] = useState<string>(EMPTY_DUE_DATE);
   const [assignedTo, setAssignedTo] = useState<string>(EMPTY_ASSIGNED_TO);
   const [priority, setPriority] = useState<Priority>(DEFAULT_PRIORITY);
+  const [remarks, setRemarks] = useState<string>(EMPTY_REMARKS);
   const [titleError, setTitleError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -56,6 +61,7 @@ export function TaskForm({ onTaskCreated }: TaskFormProps) {
     setDueDate(EMPTY_DUE_DATE);
     setAssignedTo(EMPTY_ASSIGNED_TO);
     setPriority(DEFAULT_PRIORITY);
+    setRemarks(EMPTY_REMARKS);
     setTitleError(null);
     setSubmitError(null);
   };
@@ -105,6 +111,10 @@ export function TaskForm({ onTaskCreated }: TaskFormProps) {
 
   const handlePriorityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setPriority(e.target.value as Priority);
+  };
+
+  const handleRemarksChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setRemarks(e.target.value);
   };
 
   return (
@@ -232,6 +242,24 @@ export function TaskForm({ onTaskCreated }: TaskFormProps) {
             type="date"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
+            className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label
+            htmlFor="task-remarks"
+            className="text-sm font-medium text-gray-700 dark:text-gray-300"
+          >
+            {LABEL_REMARKS}
+          </label>
+          <input
+            id="task-remarks"
+            type="text"
+            value={remarks}
+            onChange={handleRemarksChange}
+            placeholder={LABEL_REMARKS_PLACEHOLDER}
+            maxLength={REMARKS_MAX_LENGTH}
             className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
           />
         </div>
