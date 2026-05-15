@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { TaskForm } from '../components/TaskForm';
@@ -16,75 +16,82 @@ vi.mock('../hooks/useAssignableUsers', () => ({
   useAssignableUsers: mocks.useAssignableUsers,
 }));
 
-const mockTask = {
-  id: 'task-1',
-  title: 'Test Task',
-  completed: false,
-  createdAt: '2024-01-01T00:00:00.000Z',
-  priority: 'medium' as const,
-};
-
 describe('TaskForm', () => {
   beforeEach(() => {
     mocks.useAssignableUsers.mockReturnValue({ users: [], loading: false, error: null });
-    mocks.createTask.mockResolvedValue(mockTask);
+    mocks.createTask.mockReset();
   });
 
-  it('render test - renders the Remarks label, input, and placeholder text', () => {
+  it('render test - renders the Add Task and Reset buttons', () => {
     render(<TaskForm onTaskCreated={vi.fn()} />);
 
-    expect(screen.getByLabelText('Remarks')).toBeInTheDocument();
-    const remarksInput = screen.getByLabelText('Remarks');
-    expect(remarksInput).toHaveAttribute('placeholder', 'Optional remarks (max 50 characters)');
+    expect(screen.getByRole('button', { name: 'Add new task' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reset form fields' })).toBeInTheDocument();
+    expect(screen.getByText('Add Task')).toBeInTheDocument();
+    expect(screen.getByText('Reset')).toBeInTheDocument();
   });
 
-  it('interaction test - typing into the Remarks field updates its value', async () => {
+  it('interaction test - clicking Reset button opens the confirmation dialog', async () => {
     render(<TaskForm onTaskCreated={vi.fn()} />);
 
-    const remarksInput = screen.getByLabelText('Remarks');
-    await userEvent.type(remarksInput, 'My remark');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
-    expect(remarksInput).toHaveValue('My remark');
+    await userEvent.click(screen.getByRole('button', { name: 'Reset form fields' }));
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('Do you want to reset the screen?')).toBeInTheDocument();
   });
 
-  it('edge case - Remarks input enforces a maxLength of 50 characters', () => {
+  it('interaction test - confirming the reset dialog clears field values and closes the dialog', async () => {
     render(<TaskForm onTaskCreated={vi.fn()} />);
 
-    const remarksInput = screen.getByLabelText('Remarks');
-    expect(remarksInput).toHaveAttribute('maxLength', '50');
-  });
-
-  it('edge case - form can be submitted without entering a Remarks value', async () => {
-    const onTaskCreated = vi.fn();
-    render(<TaskForm onTaskCreated={onTaskCreated} />);
-
-    const titleInput = screen.getByLabelText(/Title/i);
+    // Type something in the title field
+    const titleInput = screen.getByRole('textbox', { name: /title/i });
     await userEvent.type(titleInput, 'My Task');
+    expect(titleInput).toHaveValue('My Task');
 
-    const submitButton = screen.getByRole('button', { name: 'Add new task' });
-    await userEvent.click(submitButton);
+    // Click Reset to open dialog
+    await userEvent.click(screen.getByRole('button', { name: 'Reset form fields' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
 
-    await waitFor(() => {
-      expect(onTaskCreated).toHaveBeenCalledTimes(1);
-    });
+    // Confirm reset
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm reset' }));
+
+    // Dialog should be gone and title field should be cleared
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(titleInput).toHaveValue('');
   });
 
-  it('edge case - Remarks field is cleared after successful form submission', async () => {
-    const onTaskCreated = vi.fn();
-    render(<TaskForm onTaskCreated={onTaskCreated} />);
+  it('interaction test - cancelling the reset dialog keeps field values intact and closes the dialog', async () => {
+    render(<TaskForm onTaskCreated={vi.fn()} />);
 
-    const titleInput = screen.getByLabelText(/Title/i);
-    await userEvent.type(titleInput, 'My Task');
+    const titleInput = screen.getByRole('textbox', { name: /title/i });
+    await userEvent.type(titleInput, 'Keep This');
+    expect(titleInput).toHaveValue('Keep This');
 
-    const remarksInput = screen.getByLabelText('Remarks');
-    await userEvent.type(remarksInput, 'Some remark');
-    expect(remarksInput).toHaveValue('Some remark');
+    // Click Reset to open dialog
+    await userEvent.click(screen.getByRole('button', { name: 'Reset form fields' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
 
-    const submitButton = screen.getByRole('button', { name: 'Add new task' });
-    await userEvent.click(submitButton);
+    // Cancel reset
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel reset' }));
 
-    await waitFor(() => {
-      expect(remarksInput).toHaveValue('');
-    });
+    // Dialog should be gone but title should be unchanged
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(titleInput).toHaveValue('Keep This');
+  });
+
+  it('edge case - clicking Reset alone does not clear fields without confirmation', async () => {
+    render(<TaskForm onTaskCreated={vi.fn()} />);
+
+    const titleInput = screen.getByRole('textbox', { name: /title/i });
+    await userEvent.type(titleInput, 'Do Not Clear');
+
+    // Click Reset — this opens dialog but does NOT reset yet
+    await userEvent.click(screen.getByRole('button', { name: 'Reset form fields' }));
+
+    // Field value should still be intact while dialog is open
+    expect(titleInput).toHaveValue('Do Not Clear');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });
